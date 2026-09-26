@@ -67,8 +67,11 @@ public final class DevFunctionsPanel {
 	private final int top;
 	private final Frame frame;
 	private final List<Button> buttons = new ArrayList<>();
+	private final List<DevFunctions.DevFunction> buttonFunctions = new ArrayList<>();
 	private final List<Boolean> buttonAvailable = new ArrayList<>();
 	private final List<Description> buttonDescriptions = new ArrayList<>();
+	/** What a button says while it is greyed out; null where it has nothing different to say. */
+	private final List<Description> buttonWaitDescriptions = new ArrayList<>();
 	private final List<AbstractWidget> fieldWidgets = new ArrayList<>();
 	private final List<Description> fieldDescriptions = new ArrayList<>();
 	private final Button toggle;
@@ -173,8 +176,12 @@ public final class DevFunctionsPanel {
 						.size(paired ? halfWidth : buttonWidth, BUTTON_HEIGHT)
 						.build();
 				buttons.add(button);
+				buttonFunctions.add(function);
 				buttonAvailable.add(function.available().getAsBoolean());
 				buttonDescriptions.add(new Description(function.name(), function.tooltip()));
+				buttonWaitDescriptions.add(function.waitTooltip() == null
+						? null
+						: new Description(function.name(), function.waitTooltip()));
 			}
 			y += BUTTON_HEIGHT + BUTTON_SPACING;
 		}
@@ -208,6 +215,25 @@ public final class DevFunctionsPanel {
 		applyVisibility();
 	}
 
+	/**
+	 * Re-reads which buttons can be pressed. Called every tick, because some of them change while
+	 * the screen is open: the Learn buttons grey out for the few seconds after a replug when there is
+	 * nothing yet to learn, and light up again by themselves.
+	 */
+	public void tick() {
+		boolean changed = false;
+		for (int i = 0; i < buttons.size(); i++) {
+			boolean available = buttonFunctions.get(i).available().getAsBoolean();
+			if (available != buttonAvailable.get(i)) {
+				buttonAvailable.set(i, available);
+				changed = true;
+			}
+		}
+		if (changed) {
+			applyVisibility();
+		}
+	}
+
 	/** Adds the panel's widgets to the screen, in draw order (frame behind the buttons). */
 	public void visitWidgets(Consumer<AbstractWidget> consumer) {
 		consumer.accept(frame);
@@ -230,13 +256,16 @@ public final class DevFunctionsPanel {
 	 * null when none is.
 	 * <p>
 	 * The instances are made once and handed back unchanged, so whoever is showing one can tell it
-	 * is still the same one and leave it alone - re-setting a description restarts its scroll.
+	 * is still the same one and leave it alone - re-setting a description restarts its scroll. A
+	 * greyed-out button hands back its waiting description instead, a different instance, so the
+	 * pane changes the moment the button does.
 	 */
 	public @Nullable Description hovered() {
 		for (int i = 0; i < buttons.size(); i++) {
 			Button button = buttons.get(i);
 			if (button.visible && button.isHoveredOrFocused()) {
-				return buttonDescriptions.get(i);
+				Description waiting = buttonWaitDescriptions.get(i);
+				return !buttonAvailable.get(i) && waiting != null ? waiting : buttonDescriptions.get(i);
 			}
 		}
 		for (int i = 0; i < fieldWidgets.size(); i++) {
@@ -271,9 +300,14 @@ public final class DevFunctionsPanel {
 		frame.visible = shown;
 		for (int i = 0; i < buttons.size(); i++) {
 			Button button = buttons.get(i);
+			DevFunctions.DevFunction function = buttonFunctions.get(i);
+			boolean available = buttonAvailable.get(i);
 			// Invisible and inactive: not drawn, can't be clicked, can't be reached with a controller.
 			button.visible = shown;
-			button.active = shown && buttonAvailable.get(i);
+			button.active = shown && available;
+			// A greyed-out button says so on its face. Its description only shows while it is hovered
+			// or focused, and a controller cannot focus a greyed-out button at all.
+			button.setMessage(!available && function.waitName() != null ? function.waitName() : function.name());
 		}
 		for (AbstractWidget widget : fieldWidgets) {
 			widget.visible = shown;

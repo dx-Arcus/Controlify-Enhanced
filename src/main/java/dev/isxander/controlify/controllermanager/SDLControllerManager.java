@@ -56,6 +56,12 @@ public class SDLControllerManager extends AbstractControllerManager {
 	private static SDLControllerManager instance;
 
 	/**
+	 * When a joystick of any kind last arrived or left - ignored duplicates included - as
+	 * {@link System#nanoTime()}. The dev panel's Learn buttons wait for this to settle.
+	 */
+	private static volatile long lastHotplugNanos = System.nanoTime();
+
+	/**
 	 * Joysticks we deliberately did not register because they are a second view of a controller we
 	 * already have. Kept so that their removal is recognised rather than warned about.
 	 */
@@ -91,6 +97,7 @@ public class SDLControllerManager extends AbstractControllerManager {
 					logger.validateIsTrue(jid != null, "event.jdevice.which was null during SDL_EVENT_JOYSTICK_ADDED event");
 
 					logger.debugLog("SDL event: Joystick added: {}", jid.value());
+					lastHotplugNanos = System.nanoTime();
 
 					UniqueControllerID ucid = new SDLUniqueControllerID(jid);
 					ControllerHIDInfo hidInfo = fetchTypeFromSDL(sdl, jid)
@@ -106,11 +113,14 @@ public class SDLControllerManager extends AbstractControllerManager {
 					logger.validateIsTrue(jid != null, "event.jdevice.which was null during SDL_EVENT_JOYSTICK_REMOVED event");
 
 					logger.debugLog("SDL event: Joystick removed: {}", jid.value());
+					lastHotplugNanos = System.nanoTime();
 
 					UniqueControllerID removed = new SDLUniqueControllerID(jid);
 					if (ignoredDuplicates.remove(removed)) {
-						// Never registered, so there is nothing to disconnect and nothing is wrong.
-						logger.debugLog("Ignored duplicate {} went away.", removed);
+						// Never registered, so there is nothing to disconnect and nothing is wrong. Logged
+						// rather than debug-only: when a duplicate leaves is part of what a replug looks
+						// like, and on 26 Sep it was the one step the log could not show.
+						logger.log("Ignored duplicate {} went away.", removed);
 					} else {
 						transportByUcid.remove(removed);
 						getController(removed)
@@ -435,6 +445,34 @@ public class SDLControllerManager extends AbstractControllerManager {
 	public static List<Connection> connections() {
 		SDLControllerManager manager = instance;
 		return manager == null ? List.of() : manager.describeConnections();
+	}
+
+	/**
+	 * The device path of every joystick attached right now, and nothing else, in the order SDL
+	 * lists them. Unlike {@link #connections()} this opens nothing, so it is cheap enough to ask
+	 * every tick - the dev panel does, to know when its Learn buttons have something to record.
+	 */
+	public static List<String> attachedPaths() {
+		SDLControllerManager manager = instance;
+		return manager == null ? List.of() : manager.listPaths();
+	}
+
+	/** Milliseconds since a joystick of any kind last arrived or left. */
+	public static long millisSinceHotplug() {
+		return (System.nanoTime() - lastHotplugNanos) / 1_000_000L;
+	}
+
+	private List<String> listPaths() {
+		List<String> out = new ArrayList<>();
+		for (SdlJoystickId jid : sdl.joystick().SDL_GetJoysticks()) {
+			try {
+				String path = sdl.joystick().SDL_GetJoystickPathForID(jid);
+				if (path != null && !path.isEmpty()) out.add(path);
+			} catch (Throwable ignored) {
+				// As in probe: a path that cannot be read is simply not listed.
+			}
+		}
+		return out;
 	}
 
 	private List<Connection> describeConnections() {

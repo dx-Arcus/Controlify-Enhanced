@@ -114,12 +114,20 @@ public class YACLScreenCategoryTabMixin {
 	 * puts its scroll back to the top: a long description would never scroll if this fired on every
 	 * tick. The panel hands back the same instance while the cursor stays put, which is what makes
 	 * that comparison work.
+	 * <p>
+	 * The panel also re-reads which of its buttons can be pressed here first, since some change while
+	 * the screen is open.
 	 */
 	@Inject(method = "tick", at = @At("TAIL"), require = 0)
 	private void controlify$showDevFunctionDescription(CallbackInfo ci) {
 		DevFunctionsPanel panel = controlify$devFunctionsPanel;
+		if (panel == null) {
+			return;
+		}
+		panel.tick();
+
 		OptionDescriptionWidget widget = controlify$descriptionWidget;
-		if (panel == null || widget == null) {
+		if (widget == null) {
 			return;
 		}
 

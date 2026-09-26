@@ -19,6 +19,7 @@ import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -41,12 +42,21 @@ import java.util.function.IntSupplier;
  */
 public final class DevFunctions {
 	/**
-	 * @param name      button label
-	 * @param tooltip   shown when hovering the button
-	 * @param available whether the button can currently be pressed (checked each time the screen opens)
-	 * @param action    what happens when the button is pressed
+	 * @param name        button label
+	 * @param tooltip     shown when hovering the button
+	 * @param available   whether the button can currently be pressed - asked every tick while the panel
+	 *                    is up, so a button can grey out and light up again without the screen reopening
+	 * @param action      what happens when the button is pressed
+	 * @param waitName    the button's label while it is greyed out, or null to keep {@code name}
+	 * @param waitTooltip shown in place of {@code tooltip} while the button is greyed out, or null to
+	 *                    keep showing {@code tooltip}
 	 */
-	public record DevFunction(Component name, Component tooltip, BooleanSupplier available, Runnable action) {
+	public record DevFunction(Component name, Component tooltip, BooleanSupplier available, Runnable action,
+			@Nullable Component waitName, @Nullable Component waitTooltip) {
+		/** A button with nothing different to say while it cannot be pressed. */
+		public DevFunction(Component name, Component tooltip, BooleanSupplier available, Runnable action) {
+			this(name, tooltip, available, action, null, null);
+		}
 	}
 
 	/**
@@ -64,6 +74,23 @@ public final class DevFunctions {
 
 	private static final List<DevFunction> FUNCTIONS = new ArrayList<>();
 	private static final List<DevField> FIELDS = new ArrayList<>();
+
+	/** How every XInput device path starts: {@code XInput#0}, {@code XInput#1} and so on. */
+	private static final String XINPUT_PATH_PREFIX = "XInput#";
+
+	/**
+	 * How long the Learn buttons stay greyed out after any joystick arrives or leaves - the
+	 * duplicates Controlify ignores included. One replug is several events in a row: on 26 Sep the
+	 * XInput entry dropped and came back up to 2 seconds apart, and the GameInput entry followed it
+	 * within a second. A press in the middle of that records whatever happens to be attached at that
+	 * instant - and plugging in raises no disconnect at all, so without this the buttons never grey
+	 * out there, while the receiver's path may still be attached beside the cable's. Recorded as
+	 * wired, the receiver would then be on both sides and wireless could never be recognised.
+	 */
+	private static final long SETTLE_MILLIS = 3000;
+
+	/** What the Learn buttons were last reported as, so each change is logged once. */
+	private static boolean learnReady = true;
 
 	static {
 		register(new DevFunction(
@@ -97,15 +124,19 @@ public final class DevFunctions {
 		register(new DevFunction(
 				Component.translatable("controlify.gui.dev_functions.learn_wired"),
 				Component.translatable("controlify.gui.dev_functions.learn_wired.tooltip"),
-				() -> true,
-				() -> learnConnection(true)
+				DevFunctions::canLearn,
+				() -> learnConnection(true),
+				Component.translatable("controlify.gui.dev_functions.learn.wait_name"),
+				Component.translatable("controlify.gui.dev_functions.learn.wait")
 		));
 
 		register(new DevFunction(
 				Component.translatable("controlify.gui.dev_functions.learn_wireless"),
 				Component.translatable("controlify.gui.dev_functions.learn_wireless.tooltip"),
-				() -> true,
-				() -> learnConnection(false)
+				DevFunctions::canLearn,
+				() -> learnConnection(false),
+				Component.translatable("controlify.gui.dev_functions.learn.wait_name"),
+				Component.translatable("controlify.gui.dev_functions.learn.wait")
 		));
 
 		register(new DevFunction(
@@ -272,11 +303,12 @@ public final class DevFunctions {
 			Set<String> wirelessOnly = new LinkedHashSet<>(wireless);
 			wirelessOnly.removeAll(wired);
 
-			// Every path attached, not just the one Controlify drives. On this pad it drives the
-			// XInput interface, whose path is the same on a cable and on a receiver; the interface
-			// that does change is the duplicate Controlify set aside. Reading only the one in use
-			// means reading the one path that never moves, and the answer can never change.
-			Set<String> now = currentPaths();
+			// Every path attached, not just the one Controlify drives, less XInput's (see
+			// learnable). After a replug Controlify drives the XInput interface, whose path is the
+			// same on a cable and on a receiver; the interface that does change is the GameInput
+			// duplicate it set aside. Reading only the one in use would mean reading a path that
+			// never moves, and the answer could never change.
+			Set<String> now = learnablePaths();
 			boolean looksWired = now.stream().anyMatch(wiredOnly::contains);
 			boolean looksWireless = now.stream().anyMatch(wirelessOnly::contains);
 			if (looksWired == looksWireless) {
@@ -307,11 +339,19 @@ public final class DevFunctions {
 	 * wireless, in any order, and nothing is claimed until both are known.
 	 */
 	private static void learnConnection(boolean wired) {
-		Set<String> now = currentPaths();
-		if (now.isEmpty()) {
+		Set<String> now = learnablePaths();
+		if (!canLearn()) {
+			// The Learn buttons are greyed out while this is so, which should make it unreachable.
+			// It stays for a press that lands in the moment before the panel notices: nothing is
+			// recorded, and saying so beats a press that silently does nothing.
+			boolean anything = !SDLControllerManager.attachedPaths().isEmpty();
 			MinecraftUtil.sendToast(
-					Component.translatable("controlify.toast.connection.none.title"),
-					Component.translatable("controlify.toast.connection.none.description"),
+					Component.translatable(anything
+							? "controlify.toast.connection.not_ready.title"
+							: "controlify.toast.connection.none.title"),
+					Component.translatable(anything
+							? "controlify.toast.connection.not_ready.description"
+							: "controlify.toast.connection.none.description"),
 					false);
 			return;
 		}
@@ -321,12 +361,12 @@ public final class DevFunctions {
 		// path, and not all of them every time - plugging in while the receiver is still live shows
 		// both the cable and the receiver at once. Pressing this in each of those states builds the
 		// full picture up.
-		// Nothing is ever taken off the other side. A path that turns up both ways - this pad's
-		// XInput interface is the same "XInput#0" on a cable and on a receiver - has to end up
-		// recorded on both, because that is what stops it counting as evidence for either. Moving
-		// it to whichever button was pressed last instead makes it the deciding path every time,
-		// alternately wrong in both directions, and pressing the buttons more never settles it.
-		// Clearing and starting again is the way back from a press in the wrong state.
+		// Nothing is ever taken off the other side. A path that turns up both ways - the
+		// receiver's, if it is still live when the cable goes in - has to end up recorded on both,
+		// because that is what stops it counting as evidence for either. Moving it to whichever
+		// button was pressed last instead makes it the deciding path every time, alternately wrong
+		// in both directions, and pressing the buttons more never settles it. Clearing and starting
+		// again is the way back from a press in the wrong state.
 		Set<String> known = new LinkedHashSet<>(paths(wired ? settings.wiredPaths : settings.wirelessPaths));
 		known.addAll(now);
 		String joined = String.join(DevConfig.PATH_SEPARATOR, known);
@@ -375,23 +415,57 @@ public final class DevFunctions {
 				false);
 	}
 
-	/** The device paths of everything attached right now, in the order SDL lists them. */
-	private static Set<String> currentPaths() {
+	/**
+	 * Whether a Learn press would record something trustworthy right now: some path that can tell a
+	 * cable from a receiver is attached, and nothing has arrived or left for {@link #SETTLE_MILLIS}.
+	 * The Learn buttons are greyed out, and say to wait, while this is false.
+	 * <p>
+	 * Every change is logged with the paths attached at that moment, so what the buttons did during
+	 * a replug can be read back from {@code latest.log} rather than guessed.
+	 */
+	private static boolean canLearn() {
+		boolean ready = !learnablePaths().isEmpty()
+				&& SDLControllerManager.millisSinceHotplug() >= SETTLE_MILLIS;
+		if (ready != learnReady) {
+			learnReady = ready;
+			CUtil.LOGGER.log("Learn buttons {} - attached: [{}]",
+					ready ? "ready" : "greyed out", String.join(" ", SDLControllerManager.attachedPaths()));
+		}
+		return ready;
+	}
+
+	/**
+	 * The device paths attached right now that can tell a cable from a receiver, in the order SDL
+	 * lists them. Asked every tick while the panel is up, so it comes from a lookup that opens
+	 * nothing.
+	 */
+	private static Set<String> learnablePaths() {
+		return learnable(SDLControllerManager.attachedPaths());
+	}
+
+	/**
+	 * Every path except XInput's, trimmed, blanks dropped, in the order given.
+	 * <p>
+	 * On this pad the XInput entry is {@code XInput#0} on a cable and on a receiver alike, and its
+	 * number is not even fixed - {@code XInput#1} has turned up after a replug - so it never says
+	 * which is which. It is also absent at launch: only the GameInput entry is there until the first
+	 * unplug or plug-in. Kept, it was recorded only by whichever button was pressed after a replug,
+	 * sat on that side alone, and made the report unclear until the other side was taught a second
+	 * time. Left out everywhere - including from what was saved before this - one press per side is
+	 * enough however the game was started.
+	 */
+	private static Set<String> learnable(Iterable<String> paths) {
 		Set<String> out = new LinkedHashSet<>();
-		for (SDLControllerManager.Connection c : SDLControllerManager.connections()) {
-			if (!c.path().isEmpty()) out.add(c.path());
+		for (String path : paths) {
+			String trimmed = path.trim();
+			if (!trimmed.isEmpty() && !trimmed.startsWith(XINPUT_PATH_PREFIX)) out.add(trimmed);
 		}
 		return out;
 	}
 
-	/** Splits a stored set of paths back out, ignoring blanks so an empty setting is an empty set. */
+	/** Splits a stored set of paths back out, through {@link #learnable}, so an empty setting is an empty set. */
 	private static Set<String> paths(String stored) {
-		Set<String> out = new LinkedHashSet<>();
-		for (String line : stored.split(DevConfig.PATH_SEPARATOR)) {
-			String trimmed = line.trim();
-			if (!trimmed.isEmpty()) out.add(trimmed);
-		}
-		return out;
+		return learnable(List.of(stored.split(DevConfig.PATH_SEPARATOR)));
 	}
 
 	/** Shows whether analog or keyboard-like movement is active right now. */
