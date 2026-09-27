@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Controlify Enhanced" src="assets/fork/controlify-enhanced-banner.png" width="560">
+<img alt="Controlify Enhanced" src="assets/fork/controlify-enhanced-banner.png" width="100%">
 
 **An unofficial custom build of [Controlify](https://github.com/isXander/Controlify), the controller support mod for Minecraft: Java Edition.**
 
