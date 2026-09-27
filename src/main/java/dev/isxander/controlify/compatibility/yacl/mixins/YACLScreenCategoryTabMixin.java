@@ -11,8 +11,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import dev.isxander.controlify.api.buttonguide.ButtonGuideApi;
 import dev.isxander.controlify.api.buttonguide.ButtonGuidePredicate;
 import dev.isxander.controlify.bindings.ControlifyBindings;
+import dev.isxander.controlify.compatibility.yacl.LiveOptionDescription;
 import dev.isxander.controlify.gui.devfunctions.DevFunctionsPanel;
 import dev.isxander.yacl3.api.ConfigCategory;
+import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.gui.DescriptionWithName;
 import dev.isxander.yacl3.gui.OptionDescriptionWidget;
@@ -48,11 +50,25 @@ public class YACLScreenCategoryTabMixin {
 	/** The description pane at the top of the right-hand column. */
 	@Unique @Nullable private OptionDescriptionWidget controlify$descriptionWidget;
 
-	/** The last description YACL asked for, to put back when the cursor leaves the panel. */
+	/**
+	 * The last description YACL asked for, to put back when the cursor leaves the panel - or the
+	 * same option's description brought up to date, once its value has changed under focus.
+	 */
 	@Unique @Nullable private DescriptionWithName controlify$optionDescription;
 
 	/** The panel description currently being shown in the pane, or null when YACL's own is. */
 	@Unique @Nullable private DevFunctionsPanel.Description controlify$shownDescription;
+
+	/** Whether this tab is on one of Controlify's own screens, the only ones kept live. */
+	@Unique private boolean controlify$liveDescriptions;
+
+	/**
+	 * What this tab's description pane opens with, or null for YACL's empty pane (tl87). Taken when
+	 * the tab is built, from the category handed to the constructor, rather than from a shadow of
+	 * YACL's private field: a renamed field would stop the mod loading, where a moved hook with
+	 * require = 0 only stops this.
+	 */
+	@Unique @Nullable private DescriptionWithName controlify$opening;
 
 	@Inject(method = "<init>", at = @At("RETURN"), require = 0)
 	private void onConstructCategory(CallbackInfo ci) {
@@ -66,6 +82,12 @@ public class YACLScreenCategoryTabMixin {
 			int searchFieldY = undoButton.getY() - 22;
 			controlify$devFunctionsPanel = DevFunctionsPanel.create(screen.width, category, tabArea, searchFieldY);
 		}
+	}
+
+	@Inject(method = "<init>", at = @At("RETURN"), require = 0)
+	private void controlify$checkLiveDescriptions(YACLScreen screen, ConfigCategory category, ScreenRectangle tabArea, CallbackInfo ci) {
+		controlify$liveDescriptions = LiveOptionDescription.isControlifyCategory(category);
+		controlify$opening = LiveOptionDescription.opening(category);
 	}
 
 	/**
@@ -92,7 +114,8 @@ public class YACLScreenCategoryTabMixin {
 
 	/**
 	 * Remembers which option description YACL last asked for, so it can be put back once the
-	 * cursor leaves the Dev Functions panel. Nothing else about the list changes.
+	 * cursor leaves the Dev Functions panel, and kept current while its option has focus. Nothing
+	 * else about the list changes.
 	 */
 	@WrapOperation(method = "<init>", at = @At(value = "NEW", target = "dev/isxander/yacl3/gui/OptionListWidget"), require = 0)
 	private OptionListWidget controlify$rememberOptionDescription(
@@ -144,6 +167,48 @@ public class YACLScreenCategoryTabMixin {
 				widget.setOptionDescription(controlify$optionDescription);
 			}
 		}
+	}
+
+	/**
+	 * Keeps the description pane current while an option has focus, on Controlify's own screens.
+	 * YACL hands the pane an option's description when focus arrives and every frame the mouse is
+	 * over it, but not when the value of a focused option changes - so with a controller, a
+	 * description written for the value (Target Lock's Mode, for one) kept describing the old value
+	 * until focus left and came back. {@link LiveOptionDescription} decides when to step in: only
+	 * while the pane is showing that same option, and never while the Dev Functions panel has it.
+	 */
+	@Inject(method = "tick", at = @At("TAIL"), require = 0)
+	private void controlify$keepFocusedDescriptionCurrent(CallbackInfo ci) {
+		OptionDescriptionWidget widget = controlify$descriptionWidget;
+		if (!controlify$liveDescriptions || widget == null || controlify$shownDescription != null) {
+			return;
+		}
+		OptionListWidget list = ((YACLScreenCategoryTabAccessor) (Object) this).getOptionList().getType();
+		Option<?> focused = list.getFocused() instanceof OptionListWidget.OptionEntry entry ? entry.option : null;
+		DescriptionWithName current = LiveOptionDescription.refreshed(controlify$optionDescription, focused);
+		if (current != null) {
+			controlify$optionDescription = current;
+			widget.setOptionDescription(current);
+		}
+	}
+
+	/**
+	 * Opens a tab on its own line of text, where it has one - the explainer at the top of each Aim
+	 * Assist tab (tl86). YACL starts a tab's description pane empty and fills it only from what is
+	 * hovered or focused, so clicked with the mouse a tab showed nothing there until its line was
+	 * pointed at (Donny, 27 Sep). The game lays a tab out each time it becomes the one shown - clicked,
+	 * LB or RB, or the screen opening or resizing - so the pane is set here, every time. Anything
+	 * hovered or focused afterwards takes the pane over as before.
+	 */
+	@Inject(method = "doLayout", at = @At("RETURN"), require = 0)
+	private void controlify$openOnTabLine(ScreenRectangle tabArea, CallbackInfo ci) {
+		OptionDescriptionWidget widget = controlify$descriptionWidget;
+		DescriptionWithName opening = controlify$opening;
+		if (widget == null || opening == null || controlify$shownDescription != null) {
+			return;
+		}
+		controlify$optionDescription = opening;
+		widget.setOptionDescription(opening);
 	}
 
 	@Inject(method = "visitChildren", at = @At("TAIL"), require = 0)

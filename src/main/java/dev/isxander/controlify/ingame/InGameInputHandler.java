@@ -9,7 +9,9 @@ package dev.isxander.controlify.ingame;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.ingameinput.LookInputModifier;
 import dev.isxander.controlify.aimassist.AimAssist;
+import dev.isxander.controlify.aimassist.SwingTiming;
 import dev.isxander.controlify.aimassist.TargetLock;
+import dev.isxander.controlify.api.bind.InputBinding;
 import dev.isxander.controlify.api.event.ControlifyEvents;
 import dev.isxander.controlify.bindings.ControlifyBindings;
 import dev.isxander.controlify.config.settings.profile.GyroSettings;
@@ -358,8 +360,11 @@ public class InGameInputHandler {
 		}
 
 		// Aim assist scales the impulse before the event fires, so listeners (Zoomify's zoom
-		// sensitivity, for instance) still scale whatever the player effectively asked for.
-		AimAssist.apply(lookImpulse);
+		// sensitivity, for instance) still scale whatever the player effectively asked for. A swing,
+		// pressed or made by Swing Timing Assist, is what sets off Melee Snap.
+		InputBinding attack = ControlifyBindings.ATTACK.on(controller);
+		boolean autoSwing = SwingTiming.tick(attack);
+		AimAssist.apply(lookImpulse, attack.justPressed() || autoSwing);
 
 		var modifier = new LookInputModifier(new Vector2f((float) lookImpulse.x, (float) lookImpulse.y), controller);
 		ControlifyEvents.LOOK_INPUT_MODIFIER.invoke(modifier);

@@ -17,14 +17,18 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.control.FlyingMoveControl;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Holds one mob as the player's target until they say otherwise. Aim assist on its own picks
@@ -81,7 +85,10 @@ public final class TargetLock {
 		return locked;
 	}
 
-	/** The mobs the bind would cycle through, nearest first, for the compass bar to show. */
+	/**
+	 * The mobs the bind would pick from, for the compass bar to show: nearest first in Proximity,
+	 * and in F.O.V Lock the order a tap takes them in (see {@link #inViewOrder}).
+	 */
 	public static List<Entity> candidates() {
 		return candidates;
 	}
@@ -112,9 +119,15 @@ public final class TargetLock {
 		out.append(lock.enabled ? "on" : "OFF")
 				.append(", ").append(lock.mode.getSerializedName())
 				.append(", running=").append(active())
-				.append(", ignore cone=").append(lock.overrideCone);
+				.append(", ignore cone=").append(lock.overrideCone)
+				.append(", bind=").append(lock.bindMode.getSerializedName());
+		boolean fov = lock.bindMode == LockBindMode.FOV;
+		if (fov) {
+			out.append(String.format(" (%d deg, %dm, priority %s)", lock.fovDegrees, lock.fovRangeBlocks,
+					lock.fovPriorityBlocks > 0 ? lock.fovPriorityBlocks + "m" : "off"));
+		}
 		if (locked == null) {
-			out.append(" | NO LOCK HELD, ").append(candidates.size()).append(" candidates in range");
+			out.append(" | NO LOCK HELD, ").append(candidates.size()).append(fov ? " candidates in view" : " candidates in range");
 			return out.toString();
 		}
 		LocalPlayer player = Minecraft.getInstance().player;
@@ -172,6 +185,13 @@ public final class TargetLock {
 			return;
 		}
 		if (!locked.isAlive() || locked.isRemoved() || locked.level() != player.level()) {
+			clear();
+			return;
+		}
+		// A player is held only while aim assist may target them - Target Players on, somewhere
+		// the Aim Assist setting allows, and not a spectator, out of sight, or a teammate the game
+		// would not let you hurt. Switching Target Players off lets go of one straight away.
+		if (locked instanceof Player && !mayTarget(locked)) {
 			clear();
 			return;
 		}
@@ -242,8 +262,23 @@ public final class TargetLock {
 		}
 	}
 
-	/** Moves to the next candidate, or locks the first one when nothing is locked yet. */
+	/**
+	 * Moves to the next candidate, or locks the first one when nothing is locked yet.
+	 * <p>
+	 * In F.O.V Lock the first candidate is the mob nearest the crosshair, from among those within
+	 * F.O.V Priority Range whenever any of them are in view, so a tap takes that - unless it is
+	 * already the one held, in which case the tap means "not this one" and moves to the next in
+	 * line. A tap with nothing in view does nothing there: looking at empty sky is an ordinary
+	 * miss, not a request to let go, and holding the bind is still how to let go.
+	 */
 	private static void cycle() {
+		if (settings().bindMode == LockBindMode.FOV) {
+			Entity pick = fovPick(candidates, locked);
+			if (pick != null) {
+				lockTo(pick);
+			}
+			return;
+		}
 		if (candidates.isEmpty()) {
 			clear();
 			return;
@@ -256,6 +291,24 @@ public final class TargetLock {
 			}
 		}
 		lockTo(candidates.get(next));
+	}
+
+	/**
+	 * F.O.V Lock's tap. {@code inView} is in {@link #inViewOrder}, so this is the first in line -
+	 * unless that is already the one held, in which case the next. Null means leave the lock
+	 * alone: nothing is in view, or the held mob is the only thing that is.
+	 * <p>
+	 * Kept free of anything Minecraft-specific so the rule can be exercised on its own.
+	 */
+	static <T> @Nullable T fovPick(List<T> inView, @Nullable T held) {
+		if (inView.isEmpty()) {
+			return null;
+		}
+		T best = inView.get(0);
+		if (best != held) {
+			return best;
+		}
+		return inView.size() > 1 ? inView.get(1) : null;
 	}
 
 	/** Locks a specific mob, used by the bind and by last hit mode. */
@@ -289,8 +342,11 @@ public final class TargetLock {
 			if (next == null) {
 				next = top.getFirstPassenger();
 			}
-			// Never redirect onto the player: their own mount stays the thing that was locked.
-			if (next == null || next == top || next == Minecraft.getInstance().player) {
+			// Never redirect onto the player: their own mount stays the thing that was locked. Nor
+			// onto another player aim assist may not target: with Target Players off, a player
+			// climbing onto a locked horse leaves the lock on the horse.
+			if (next == null || next == top || next == Minecraft.getInstance().player
+					|| (next instanceof Player && !mayTarget(next))) {
 				break;
 			}
 			top = next;
@@ -349,6 +405,16 @@ public final class TargetLock {
 	}
 
 	/**
+	 * Whether aim assist may target this entity at all, by {@link AimAssist#isEligible} - which is
+	 * where Target Players decides about other players.
+	 */
+	private static boolean mayTarget(Entity entity) {
+		LocalPlayer player = Minecraft.getInstance().player;
+		return player != null
+				&& AimAssist.isEligible(player, entity, Controlify.instance().config().getSettings().aimAssistSettings());
+	}
+
+	/**
 	 * Whether this is something the bind would have offered anyway. Reusing the bind's own
 	 * eligibility keeps the two routes to a lock agreeing: last hit mode can't hand you a target
 	 * the bind would have refused, such as one beyond Locked Range or one the target filter
@@ -375,6 +441,9 @@ public final class TargetLock {
 	private static List<Entity> findCandidates(LocalPlayer player) {
 		AimAssistSettings aimAssist = Controlify.instance().config().getSettings().aimAssistSettings();
 		TargetLockSettings settings = aimAssist.targetLock;
+		if (settings.bindMode == LockBindMode.FOV) {
+			return findInView(player, aimAssist, settings);
+		}
 
 		// How far the bind can reach is Locked Range: the distance a locked mob still gets help at,
 		// so being able to lock exactly that far is the only version that makes sense. The Letting
@@ -406,7 +475,70 @@ public final class TargetLock {
 
 		List<Entity> chosen = onScreen.isEmpty() ? offScreen : onScreen;
 		chosen.sort(Comparator.comparingDouble(player::distanceTo));
-		return chosen.size() > MAX_CANDIDATES ? List.copyOf(chosen.subList(0, MAX_CANDIDATES)) : List.copyOf(chosen);
+		return capped(chosen);
+	}
+
+	/**
+	 * F.O.V Lock's candidates: every mob within F.O.V Range whose nearest edge is inside F.O.V Angle
+	 * of the crosshair, in {@link #inViewOrder}. The angle is measured exactly as Crosshair Cone
+	 * measures it - to the nearest part of the hitbox - so the crosshair anywhere on a mob reads as
+	 * dead centre.
+	 * <p>
+	 * There is no off-screen fallback the way Proximity has one. Picking by where you are looking
+	 * is the whole point of this mode, so a mob outside the angle is simply not offered.
+	 */
+	private static List<Entity> findInView(LocalPlayer player, AimAssistSettings aimAssist, TargetLockSettings settings) {
+		int searchRange = settings.fovRangeBlocks;
+		if (searchRange <= 0) {
+			return List.of();
+		}
+
+		AABB searchBox = player.getBoundingBox().inflate(searchRange);
+		List<Entity> inView = new ArrayList<>();
+		Map<Entity, Double> offsets = new IdentityHashMap<>();
+		Map<Entity, Double> distances = new IdentityHashMap<>();
+
+		for (Entity entity : player.level().getEntities(player, searchBox,
+				entity -> AimAssist.isEligible(player, entity, aimAssist))) {
+			double distance = player.distanceTo(entity);
+			if (distance > searchRange) {
+				continue;
+			}
+			// Mounts are left out for the same reason as in Proximity: the rider is what gets locked.
+			if (entity.isVehicle()) {
+				continue;
+			}
+			double offset = AimAssist.angularOffset(player, entity, searchRange);
+			if (offset > settings.fovDegrees) {
+				continue;
+			}
+			offsets.put(entity, offset);
+			distances.put(entity, distance);
+			inView.add(entity);
+		}
+
+		inView.sort(inViewOrder(offsets::get, distances::get, settings.fovPriorityBlocks));
+		return capped(inView);
+	}
+
+	/**
+	 * The order F.O.V Lock offers mobs in. Those within F.O.V Priority Range come first, however
+	 * far off the crosshair: one further out is only reached once nothing inside the range is in
+	 * view, because the mob close by is the one being fought, and a far one that happens to sit
+	 * nearer the crosshair is not. Within each group the one nearest the crosshair comes first, and
+	 * the closer of two that are as near it - both with the crosshair on them, most often. A range
+	 * of 0 puts every mob in the one group, so only the crosshair counts.
+	 * <p>
+	 * Kept free of anything Minecraft-specific so the order can be exercised on its own.
+	 */
+	static <T> Comparator<T> inViewOrder(ToDoubleFunction<T> offset, ToDoubleFunction<T> distance, int priorityBlocks) {
+		return Comparator.<T>comparingInt(candidate -> (priorityBlocks > 0 && distance.applyAsDouble(candidate) <= priorityBlocks) ? 0 : 1)
+				.thenComparingDouble(offset)
+				.thenComparingDouble(distance);
+	}
+
+	private static List<Entity> capped(List<Entity> sorted) {
+		return sorted.size() > MAX_CANDIDATES ? List.copyOf(sorted.subList(0, MAX_CANDIDATES)) : List.copyOf(sorted);
 	}
 
 	/** Whether the mob is inside the player's actual field of view, horizontally and vertically. */

@@ -12,11 +12,11 @@
 
 ## What's different in this fork
 
-Controller aim assist with target lock, a couple of quality-of-life options, and fixes for three annoyances — all on Controlify's **Global Settings** screen. Everything else behaves exactly like the official mod.
+Controller aim assist with target lock, a couple of quality-of-life options, and fixes for two annoyances — all on Controlify's **Global Settings** screen. Everything else behaves exactly like the official mod.
 
 **New options**
 
-- [Aim assist](#aim-assist) — for melee and bows, with [target lock](#target-lock), a [compass bar](#compass-bar), [marker and compass colours](#marker-and-compass-colours) and a [custom target list](#custom-target-list). Off by default.
+- [Aim assist](#aim-assist) — for melee and bows, with [target lock](#target-lock), [snaps and Swing Timing Assist](#snaps-and-swing-timing-assist), a [compass bar](#compass-bar), [marker and compass colours](#marker-and-compass-colours) and a [custom target list](#custom-target-list). Off by default.
 - [Edit Glyph Positions](#edit-glyph-positions) — move the in-game button guides out of the way.
 - [Disable Whitelist & Force Analog Movement](#disable-whitelist--force-analog-movement) — analog movement on every server.
 
@@ -41,26 +41,54 @@ Controller aim assist with target lock, a couple of quality-of-life options, and
 
 ### Aim assist
 
-With aim assist on, the look stick slows as your crosshair comes onto a mob and pulls gently towards it, so you stop overshooting. It only scales the look input you're already giving — it never moves the camera on its own, never widens a hitbox, and never changes where an attack lands.
+With aim assist on, the look stick slows as your crosshair comes onto a mob and pulls gently towards it, so you stop overshooting. It only scales the look input you're already giving — it never moves the camera on its own, never widens a hitbox, and never changes where an attack lands. The [snaps and Swing Timing Assist](#snaps-and-swing-timing-assist) go further, and stay off until you switch them on.
+
+**Open Aim Assist Menu** in Global Settings opens its screen: five tabs — **General**, **Aim Help**, **Snaps**, **Lock-On** and **Extras** — with LB and RB to move between them. Each tab opens with a line on how its settings work with the rest.
+
+<p align="center">
+  <img alt="The General tab of the Aim Assist screen" src="assets/fork/aim-assist-general.png" width="820">
+  <br>
+  <em>The General tab.</em>
+</p>
 
 **Aim Assist** — off, **Singleplayer & LAN**, or **Everywhere**.
 
 > [!WARNING]
-> Many servers treat any aim assist as an unfair advantage. Only use **Everywhere** on servers you know allow it. **Singleplayer & LAN** is the default and never touches a multiplayer server.
+> Many servers treat any aim assist as an unfair advantage. Only use **Everywhere** on servers you know allow it. **Singleplayer & LAN** is the default: your own worlds, opened to LAN or not, and LAN worlds you join from the multiplayer screen's list of LAN games. A world you join by its address counts as a server.
 
-**Target** — hostile mobs (provoked ones included, like an angry wolf pack), all mobs, or a custom list. Players are never targeted.
+**Target** — hostile mobs (provoked ones included, like an angry wolf pack), all mobs, or a custom list. Players are left out unless **Target Players** is on, which lets them count whatever Target is set to, for every part of aim assist. Teammates the game won't let you hurt stay out either way.
 
-**Melee** and **Bow** are tuned separately, each with **Strength** (how hard it slows and pulls), **Crosshair Cone** (how far off a mob can be, in degrees) and **Distance** (in blocks). Bow takes over while you draw a bow or hold a loaded crossbow, and is gentler — it never leads a shot or allows for arrow drop.
+> [!WARNING]
+> Aim help against other players is treated as cheating by almost every server and anti-cheat. **Target Players** is off by default, and even when it's on, players only count where the **Aim Assist** setting allows.
+
+**Melee** and **Bow**, on the **Aim Help** tab, are tuned separately, each with **Strength** (how hard it slows and pulls), **Crosshair Cone** (how far off a mob can be, in degrees) and **Distance** (in blocks). Bow takes over while you draw a bow or hold a loaded crossbow, and is gentler — it never leads a shot or allows for arrow drop.
 
 <p align="center">
-  <img alt="The Aim Assist settings screen" src="assets/fork/aim-assist-options.png" width="820">
+  <img alt="The Aim Help, Snaps, Lock-On and Extras tabs" src="assets/fork/aim-assist-tabs.png" width="820">
   <br>
-  <em>Melee and bow are tuned independently.</em>
+  <em>The other four tabs, narrowed to fit side by side: Aim Help and Snaps on the left, Lock-On and Extras on the right.</em>
 </p>
+
+#### Snaps and Swing Timing Assist
+
+These go further than aim assist: they turn the camera or swing for you. All three are on the **Snaps** tab, each is off until you switch it on, and like the rest they only run where the **Aim Assist** setting allows.
+
+- **Melee Snap** (**Snap on Swing**) turns the camera onto a mob when you swing at nothing — your locked target if it's within **Snap Range**, otherwise the hostile mob nearest your crosshair within **Snap Angle** and **Snap Range**. A swing at a block or a mob is never pulled away.
+- **Ranged Snap** (**Snap on Aim**) does the same as you start drawing a bow or bring up a loaded crossbow.
+- Each snap has its own **Snap Range**, **Snap Angle**, **Snap Strength** (how fast it turns — 600 degrees a second at 100%), **Ramp Up** and **Ramp Down** (how quickly it gets up to speed, and how quickly it slows to land).
+- **Swing Timing Assist** — hold attack and it swings again each time the weapon in your hand has recharged, for as long as you hold it. Its swings set off Melee Snap just as a press would.
+
+> [!WARNING]
+> These act for you rather than helping aim you're already making, which many servers and anti-cheats treat as cheating. Use them in singleplayer, or where everyone knows you have them and is fine with it.
 
 #### Target lock
 
-Holds one mob as your target instead of whichever is nearest the crosshair. Bind **Lock Target** under Gameplay in Controller Bindings: tap to lock the nearest mob or move to the next, hold to let go. It follows the **Aim Assist** setting, so it never runs anywhere aim assist isn't allowed.
+Holds one mob as your target instead of whichever is nearest the crosshair. Bind **Lock Target** under Gameplay in Controller Bindings: tap to lock a mob or move to the next, hold to let go. It follows the **Aim Assist** setting, so it never helps aim anywhere aim assist isn't allowed. Its settings are on the **Lock-On** tab.
+
+**Keybind Mode** decides which mob a tap picks:
+
+- **Proximity** — the nearest mob within **Locked Range**, ones on screen first. Each tap moves to the next nearest. The default.
+- **F.O.V Lock** — the mob closest to your crosshair, within **F.O.V Angle** and **F.O.V Range**. Mobs within **F.O.V Priority Range** come first, so a close mob isn't passed over for a distant one that happens to sit nearer the crosshair.
 
 <p align="center">
   <img alt="The target marker over a locked slime" src="assets/fork/target-marker-in-game.jpg" width="820">
@@ -74,24 +102,20 @@ Holds one mob as your target instead of whichever is nearest the crosshair. Bind
 - **Last hit lock** — the bind, plus whatever you hit and whatever hits you. A mob that shoots you only takes the lock when there's nothing else worth locking.
 - **Marker only** — the marker and compass, with no aim help at all.
 
-While a target is locked, **Locked Strength**, **Locked Range** and **Locked Speed** stand in for the melee and bow settings. **Show Target Marker** draws the marker — solid with line of sight, faded without — and keeps it readable at range.
+While a target is locked, **Locked Strength**, **Locked Range** and **Locked Speed** stand in for the melee and bow settings. At 100%, Locked Strength pulls twice as hard as Strength does at 100%, and Locked Speed lets that pull turn twice as fast. **Override Melee Settings** and **Override Bow Settings** decide which of the two they stand in for — both on to start with. Switch one off and that weapon keeps its own **Strength**, **Crosshair Cone** and **Distance** on a locked mob; the lock still decides which mob it is.
+
+**Show Target Marker**, on the **Extras** tab, draws the marker — solid with line of sight, faded without — and keeps it readable at range.
 
 **Ignore Crosshair Cone** pulls towards the locked mob from any angle, even when you're both standing still.
 
 > [!WARNING]
 > This tracks a mob for you rather than helping aim you're already making. That's an unfair advantage over players without Controlify, and many anti-cheats will likely flag it. Use it in singleplayer, or where everyone knows you have it and is fine with it.
 
-**Letting Go** — with **Drop Distant Targets** off, a lock only ends when the mob dies or you clear it. Turn it on and the lock drops once you've been further than **Range** (or **Flying Range**) from the mob for longer than **Time Before Dropping**. **Reset Depth** is how far back inside you have to come to reset the timer.
-
-<p align="center">
-  <img alt="The Target Lock settings" src="assets/fork/target-lock-options.png" width="820">
-  <br>
-  <em>The Target Lock section. Everything under Letting Go stays greyed out until Drop Distant Targets is on.</em>
-</p>
+**Letting Go**, on the **Extras** tab — with **Drop Distant Targets** off, a lock only ends when the mob dies or you clear it. Turn it on and the lock drops once you've been further than **Drop Range** (or **Flying Drop Range**) from the mob for longer than **Time Before Dropping**. **Reset Depth** is how far back inside you have to come to reset the timer. The four sliders stay greyed out until Drop Distant Targets is on.
 
 #### Compass bar
 
-**Show Compass Bar** puts a strip along the top of the screen showing which way the locked mob is, with its name, its distance, and the countdown before a distant lock is dropped. **Compass Position** opens a live editor: drag it, type exact offsets, snap it to a corner, set its width, or reset it.
+**Show Compass Bar**, on the **Extras** tab, puts a strip along the top of the screen showing which way the locked mob is, with its name, its distance, and the countdown before a distant lock is dropped. **Compass Position** opens a live editor: drag it, type exact offsets, snap it to a corner, set its width, or reset it.
 
 <p align="center">
   <img alt="The compass bar above a locked slime" src="assets/fork/compass-bar-in-game.jpg" width="900">

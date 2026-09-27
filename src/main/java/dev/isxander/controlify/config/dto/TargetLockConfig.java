@@ -14,6 +14,10 @@ import dev.isxander.controlify.aimassist.TargetLockMode;
  * Serialised target lock settings. A section of its own rather than more fields on
  * {@link AimAssistConfig}, which would otherwise run into the 16-field limit a single record
  * codec allows.
+ * <p>
+ * This record is now at that limit itself: {@code bind} is the sixteenth field. Anything added
+ * here next has to go into a nested section, the way {@link CompassConfig} and
+ * {@link LockBindConfig} do.
  */
 public record TargetLockConfig(
 		boolean enabled,
@@ -30,7 +34,8 @@ public record TargetLockConfig(
 		boolean arrowEnabled,
 		int arrowColor,
 		int markerFloorBlocks,
-		CompassConfig compass
+		CompassConfig compass,
+		LockBindConfig bind
 ) {
 	/** Widest a range slider goes. Well past any sensible value, but it costs nothing to allow. */
 	public static final int MAX_RANGE = 500;
@@ -71,7 +76,8 @@ public record TargetLockConfig(
 			true,
 			DEFAULT_ARROW_COLOR,
 			DEFAULT_MARKER_FLOOR,
-			CompassConfig.DEFAULT
+			CompassConfig.DEFAULT,
+			LockBindConfig.DEFAULT
 	);
 
 	public static final Codec<TargetLockConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -89,6 +95,7 @@ public record TargetLockConfig(
 			Codec.BOOL.optionalFieldOf("arrow_enabled", DEFAULT.arrowEnabled()).forGetter(TargetLockConfig::arrowEnabled),
 			Codec.intRange(0, 0xFFFFFF).optionalFieldOf("arrow_colour", DEFAULT.arrowColor()).forGetter(TargetLockConfig::arrowColor),
 			Codec.intRange(MIN_MARKER_FLOOR, MAX_MARKER_FLOOR).optionalFieldOf("marker_floor_blocks", DEFAULT.markerFloorBlocks()).forGetter(TargetLockConfig::markerFloorBlocks),
-			CompassConfig.CODEC.optionalFieldOf("compass", DEFAULT.compass()).forGetter(TargetLockConfig::compass)
+			CompassConfig.CODEC.optionalFieldOf("compass", DEFAULT.compass()).forGetter(TargetLockConfig::compass),
+			LockBindConfig.CODEC.optionalFieldOf("bind", DEFAULT.bind()).forGetter(TargetLockConfig::bind)
 	).apply(instance, TargetLockConfig::new));
 }

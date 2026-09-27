@@ -37,6 +37,9 @@ import java.util.List;
  * A standstill opposite a standing mob produces nothing, so the camera never drifts out from under
  * the player. It never widens a hitbox and never changes where an attack lands, so the player's own
  * aim still decides the outcome.
+ * <p>
+ * The snaps in {@link AimSnap} are the exception, and only when switched on: they turn the camera
+ * onto a target by themselves, on a swing or on starting to aim.
  */
 public final class AimAssist {
 	/**
@@ -49,7 +52,10 @@ public final class AimAssist {
 	private static final double MAX_FOLLOW = 1.40;
 	private static final double MAX_GAIN = 0.90;
 
-	/** Fraction of the remaining angle a pull closes each tick when no target is locked. */
+	/**
+	 * Fraction of the remaining angle a pull closes each tick when the Locked settings are not in
+	 * use: no target locked, or the weapon's Override switch off (tl89).
+	 */
 	private static final double DEFAULT_GAIN = 0.45;
 
 	/**
@@ -70,8 +76,22 @@ public final class AimAssist {
 	 */
 	private static final double BOW_FOLLOW = 0.0;
 
-	/** Ceiling on the follow, so sprinting past a mob at arm's length cannot whip the camera round. */
+	/**
+	 * Ceiling on the follow, so sprinting past a mob at arm's length cannot whip the camera round.
+	 * A locked target's strength past what melee's 100% gives raises it - see {@link #followCeilingFor}.
+	 */
 	private static final double MAX_FOLLOW_RATE = 6.0;
+
+	/**
+	 * Locked Strength and Locked Speed reach twice as far as the melee and bow settings. Their
+	 * sliders still read 0 to 100%, but each percent counts double here: 50% locked is what 100%
+	 * does for melee, and 100% locked is twice that. Donny found both too weak even at 100% and
+	 * asked for exactly this on 27 Sep - the numbers behind the slider doubled, the slider kept.
+	 */
+	private static final int LOCKED_SCALE = 2;
+
+	/** The furthest any strength or speed reaches once scaled: a locked slider at 100%. */
+	private static final int MAX_SCALED_PERCENT = 100 * LOCKED_SCALE;
 
 	/**
 	 * Where on a mob the assist aims, as a fraction of its eye height. Aiming at the centre of the
@@ -126,6 +146,8 @@ public final class AimAssist {
 	private static Debug lastDebug = Debug.INACTIVE;
 	private static @Nullable Entity lockedBowTarget;
 	private static Counts lastCounts = new Counts();
+	/** Whether a projectile was being aimed last tick, so Ranged Snap goes off only as aiming starts. */
+	private static boolean wasAimingProjectile;
 
 	private AimAssist() {
 	}
@@ -138,13 +160,17 @@ public final class AimAssist {
 	 * Scales {@code lookImpulse} down while the crosshair is near a target. Called from the look
 	 * handler before Controlify's look event fires, so mods listening to that event (Zoomify's
 	 * zoom sensitivity, for one) still scale the result as they always have.
+	 *
+	 * @param swung whether a swing was made this tick - pressed, or by Swing Timing Assist - which
+	 *              is what sets off Melee Snap
 	 */
-	public static void apply(Vector2d lookImpulse) {
+	public static void apply(Vector2d lookImpulse, boolean swung) {
 		AimAssistSettings settings = Controlify.instance().config().getSettings().aimAssistSettings();
 		LocalPlayer player = Minecraft.getInstance().player;
 
 		if (player == null || settings.mode == AimAssistMode.OFF || !settings.mode.canAimAssist()) {
 			lockedBowTarget = null;
+			AimSnap.stop();
 			lastDebug = Debug.INACTIVE;
 			return;
 		}
@@ -155,6 +181,7 @@ public final class AimAssist {
 		// Marker only means exactly that: the lock, the arrow and the compass, and no aim help at all.
 		if (lockRunning && !lock.mode.assistsLockedTarget()) {
 			lockedBowTarget = null;
+			AimSnap.stop();
 			lastDebug = Debug.INACTIVE;
 			return;
 		}
@@ -165,13 +192,35 @@ public final class AimAssist {
 			lockedBowTarget = null;
 		}
 
+		// Melee Snap on a swing, Ranged Snap as aiming starts. While one is turning the camera it has
+		// it to itself; everything below picks up again once it lands.
+		boolean startedAiming = bowMode && !wasAimingProjectile;
+		wasAimingProjectile = bowMode;
+		if (swung && !bowMode) {
+			AimSnap.start(AimSnap.Kind.MELEE, player, settings, heldTarget);
+		}
+		if (startedAiming) {
+			AimSnap.start(AimSnap.Kind.RANGED, player, settings, heldTarget);
+		}
+		if (AimSnap.step(player, settings, bowMode, lookImpulse)) {
+			Entity snapTarget = AimSnap.target();
+			lastDebug = new Debug(snapTarget, snapTarget == null ? 0 : angleTo(player, snapTarget), 1, bowMode, true,
+					lastCounts, settings.targets, lookImpulse.length(), heldTarget != null);
+			return;
+		}
+
+		// While a mob is locked the Locked settings take over from the weapon's own - for melee and
+		// for the bow each, while its Override switch is on (tl89). Off, the lock still decides which
+		// mob, and the weapon's own Strength, Crosshair Cone and Distance help with it.
+		boolean useLocked = usesLockedSettings(heldTarget != null, bowMode, settings);
 		double cone = (bowMode ? settings.bowConeTenths : settings.meleeConeTenths) / 10.0;
-		double range = heldTarget != null
+		double range = useLocked
 				? lock.lockedRangeBlocks
 				: (bowMode ? settings.bowDistanceBlocks : settings.meleeDistanceBlocks);
-		int strength = heldTarget != null
-				? lock.lockedStrengthPercent
+		int strength = useLocked
+				? lock.lockedStrengthPercent * LOCKED_SCALE
 				: (bowMode ? settings.bowStrengthPercent : settings.meleeStrengthPercent);
+		int lockedSpeed = lock.lockedSpeedPercent * LOCKED_SCALE;
 
 		// A held target skips the search entirely. That is the whole point of the lock: the mob you
 		// chose keeps the assist, and the zombie wandering past does not get to take it.
@@ -198,7 +247,7 @@ public final class AimAssist {
 		// root keeps the assist meaningful across most of the cone instead of only dead centre.
 		// A lock set to override the cone holds full strength from any angle, which is the setting
 		// that turns this from help near where you are aiming into outright tracking.
-		boolean ignoreCone = heldTarget != null && lock.overrideCone;
+		boolean ignoreCone = useLocked && lock.overrideCone;
 		double coneProximity = Math.sqrt(Mth.clamp(1 - (angle / cone), 0, 1));
 
 		// Two different questions, which were sharing one answer. The pull asks how much help to
@@ -234,17 +283,19 @@ public final class AimAssist {
 		// where neither the player nor the mob is moving, so the gate comes off entirely.
 		double inputStrength = ignoreCone ? 1 : Math.max(stickStrength, trackingStrength);
 		double pullCap = pullFor(strength);
-		double gain = heldTarget != null ? gainFor(lock.lockedSpeedPercent) : DEFAULT_GAIN;
+		double gain = useLocked ? gainFor(lockedSpeed) : DEFAULT_GAIN;
 		double pullScale = pullProximity * inputStrength;
 
 		// Speed drives the sweep, which is what it reads as on the slider: how fast the camera comes
-		// round to the target. Strength still decides how hard it holds once it is there.
-		double effectiveCap = pullCap;
+		// round to the target. Strength still decides how hard it holds once it is there. Once the
+		// gain is as high as it can usefully go, more Speed lets the pull itself turn faster instead
+		// (speedBoost) - twice as fast at 100% on the slider.
+		double effectiveCap = useLocked ? pullCap * speedBoost(lockedSpeed) : pullCap;
 		if (ignoreCone) {
 			double sweepBand = SWEEP_FULL_ANGLE - TURN_IN_CUSHION * 2;
 			double reach = Mth.clamp((angle - TURN_IN_CUSHION * 2) / sweepBand, 0, 1);
-			double sweepRate = MAX_SWEEP_RATE * Mth.clamp(lock.lockedSpeedPercent, 0, 100) / 100.0;
-			effectiveCap = Mth.lerp(reach, pullCap, Math.max(pullCap, sweepRate));
+			double sweepRate = MAX_SWEEP_RATE * Mth.clamp(lockedSpeed, 0, MAX_SCALED_PERCENT) / 100.0;
+			effectiveCap = Mth.lerp(reach, effectiveCap, Math.max(effectiveCap, sweepRate));
 		}
 
 		double yawError = Mth.wrapDegrees(yawOf(toTarget) - player.getYRot());
@@ -268,8 +319,8 @@ public final class AimAssist {
 		// three levels can follow, which is why the crosshair felt anchored at range and loose in a
 		// mob's face. Make up the part of that the cap cannot reach. Further out there is no
 		// shortfall and this is exactly zero, so the feel at range is untouched.
-		double follow = bowMode && heldTarget == null ? BOW_FOLLOW : followFor(strength);
-		double followRate = Math.min(Math.max(0, swing - pullCap) * follow, MAX_FOLLOW_RATE) * pullProximity;
+		double follow = bowMode && !useLocked ? BOW_FOLLOW : followFor(strength);
+		double followRate = Math.min(Math.max(0, swing - pullCap) * follow, followCeilingFor(strength)) * pullProximity;
 		double followYaw = 0;
 		double followPitch = 0;
 		if (followRate > 0 && swing > 1.0e-4) {
@@ -293,13 +344,23 @@ public final class AimAssist {
 				Math.hypot(yawPull + followYaw, pitchPull + followPitch), heldTarget != null);
 	}
 
+	/**
+	 * Whether a locked mob's aim help uses the Locked settings - Locked Strength, Range and Speed, and
+	 * Ignore Crosshair Cone - rather than the weapon's own: only while a mob is locked, and only for a
+	 * weapon whose Override switch is on (tl89). Kept apart, with nothing of the world in it, so it can
+	 * be checked on its own.
+	 */
+	static boolean usesLockedSettings(boolean locked, boolean bowMode, AimAssistSettings settings) {
+		return locked && (bowMode ? settings.lockOverridesBow : settings.lockOverridesMelee);
+	}
+
 	/** Bearing of a direction, in Minecraft's yaw convention. */
-	private static double yawOf(Vec3 direction) {
+	static double yawOf(Vec3 direction) {
 		return Math.toDegrees(Math.atan2(-direction.x, direction.z));
 	}
 
 	/** Elevation of a direction, in Minecraft's pitch convention. */
-	private static double pitchOf(Vec3 direction) {
+	static double pitchOf(Vec3 direction) {
 		double horizontal = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
 		return Math.toDegrees(-Math.atan2(direction.y, horizontal));
 	}
@@ -309,7 +370,7 @@ public final class AimAssist {
 	 * {@code getDeltaMovement}, which the client only refreshes for other entities when the server
 	 * sends a velocity packet, and so reads zero for most of a walking mob's life.
 	 */
-	private static Vec3 tickMotion(Entity entity) {
+	static Vec3 tickMotion(Entity entity) {
 		return new Vec3(entity.getX() - entity.xOld, entity.getY() - entity.yOld, entity.getZ() - entity.zOld);
 	}
 
@@ -412,24 +473,50 @@ public final class AimAssist {
 	}
 
 	static boolean isEligible(LocalPlayer player, Entity entity, AimAssistSettings settings) {
+		return isEligible(player, entity, settings.targets, settings.customTargets, playersAllowed(settings));
+	}
+
+	/**
+	 * Whether a mob is hostile by the rule Target: Hostile uses - a monster, or a neutral mob that is
+	 * angry - whatever Target is actually set to. It is what the snaps look for. Other players count
+	 * as well while Target Players is on, as they do everywhere else.
+	 */
+	static boolean isHostile(LocalPlayer player, Entity entity, AimAssistSettings settings) {
+		return isEligible(player, entity, AimAssistTargets.HOSTILE, List.of(), playersAllowed(settings));
+	}
+
+	/**
+	 * Whether other players may be targeted at all: only with Target Players on, and only where the
+	 * Aim Assist setting allows aim assist. That holds in Marker only too, which otherwise runs
+	 * anywhere - a marker and compass bar on a mob are an overlay, but on a player they are an
+	 * advantage over that player.
+	 */
+	private static boolean playersAllowed(AimAssistSettings settings) {
+		return settings.targetPlayers && settings.mode.canAimAssist();
+	}
+
+	private static boolean isEligible(LocalPlayer player, Entity entity, AimAssistTargets targets, List<String> customTargets,
+			boolean players) {
 		if (entity == player || entity == player.getVehicle() || !entity.isAlive()) {
 			return false;
 		}
 		if (entity.isSpectator() || entity.isInvisibleTo(player)) {
 			return false;
 		}
-		// Players are deliberately never targeted, and armour stands, boats and the like only
-		// count if the player has explicitly listed them.
-		if (entity instanceof Player) {
-			return false;
+		// Other players only with Target Players on, and then whatever Target is set to - Donny's
+		// switch, 27 Sep. Never one the game itself would not let you hurt: a teammate while the
+		// team has friendly fire off, by the game's own rule for it.
+		if (entity instanceof Player other) {
+			return players && player.canHarmPlayer(other);
 		}
 
+		// Armour stands, boats and the like only count if the player has explicitly listed them.
 		boolean isMob = entity instanceof LivingEntity && !(entity instanceof ArmorStand);
 
-		return switch (settings.targets) {
+		return switch (targets) {
 			case HOSTILE -> isMob && (entity.getType().getCategory() == MobCategory.MONSTER || isAngry(entity));
 			case ALL_MOBS -> isMob;
-			case CUSTOM -> settings.customTargets.contains(typeId(entity));
+			case CUSTOM -> customTargets.contains(typeId(entity));
 		};
 	}
 
@@ -447,7 +534,7 @@ public final class AimAssist {
 	}
 
 	/** The point the magnetism pulls towards: just below the head, around the top of the chest. */
-	private static Vec3 aimPoint(Entity entity) {
+	static Vec3 aimPoint(Entity entity) {
 		AABB box = entity.getBoundingBox();
 		// Clamped into the hitbox, since a few entities sit their eyes at or above their own box.
 		double y = Mth.clamp(box.minY + entity.getEyeHeight() * AIM_HEIGHT_FACTOR, box.minY, box.maxY);
@@ -463,9 +550,13 @@ public final class AimAssist {
 	 * than its centre. A zombie three blocks away is over a metre wide, so measuring to the centre
 	 * reports several degrees off even when the crosshair is plainly on it.
 	 *
+	 * <p>
+	 * Package-private so target lock's F.O.V Lock measures its angle exactly the way Crosshair Cone
+	 * does, rather than by a second calculation that could drift from this one.
+	 *
 	 * @return 0 when the look ray passes through the hitbox
 	 */
-	private static double angularOffset(LocalPlayer player, Entity entity, double range) {
+	static double angularOffset(LocalPlayer player, Entity entity, double range) {
 		Vec3 eye = player.getEyePosition();
 		Vec3 view = player.getViewVector(1.0f);
 		AABB box = entity.getBoundingBox().inflate(RAY_HITBOX_PADDING);
@@ -494,23 +585,59 @@ public final class AimAssist {
 		return Math.toDegrees(Math.acos(Mth.clamp(a.dot(b) / lengths, -1, 1)));
 	}
 
-	/** Strength: how far the look input is scaled down at the centre of the cone. */
+	/*
+	 * The percentages below are on melee's scale, where 100 is melee's 100%. A locked target's
+	 * arrive doubled (LOCKED_SCALE), so they run on to 200. Three stop at 100, where going on
+	 * would make things worse rather than stronger: the slowdown, the gain and the follow's share.
+	 * The pull's ceiling, the follow's ceiling and the speed boost carry on to 200.
+	 */
+
+	/**
+	 * Strength: how far the look input is scaled down at the centre of the cone. Stops at 100,
+	 * where it is total: past it the look input would be multiplied by a negative number and the
+	 * stick pushed backwards.
+	 */
 	private static double slowdownFor(int percent) {
 		return 1 - Mth.clamp(percent, 0, 100) / 100.0;
 	}
 
-	/** Strength: the ceiling on the pull, in degrees per tick. */
+	/** Strength: the ceiling on the pull, in degrees per tick. Twice melee's at a locked 100%. */
 	private static double pullFor(int percent) {
-		return MAX_PULL * Mth.clamp(percent, 0, 100) / 100.0;
+		return MAX_PULL * Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
 	}
 
-	/** Strength: how much of the close-range shortfall is made up. */
+	/**
+	 * Strength: how much of the close-range shortfall is made up. Stops at 100: past it the
+	 * crosshair would be carried ahead of a mob sliding across the view rather than onto it. A
+	 * stronger lock raises the follow's ceiling instead - {@link #followCeilingFor}.
+	 */
 	private static double followFor(int percent) {
 		return MAX_FOLLOW * Mth.clamp(percent, 0, 100) / 100.0;
 	}
 
-	/** Speed: how much of the angle still to go the pull closes each tick. */
+	/**
+	 * Strength: the ceiling on the follow, in degrees per tick. {@link #MAX_FOLLOW_RATE} up to 100;
+	 * past it, only reached by a locked target, it rises in step with the pull, to twice at a locked
+	 * 100%. With the follow's share held at its 100 value the two together still never carry the
+	 * crosshair past a mob sliding across the view.
+	 */
+	private static double followCeilingFor(int percent) {
+		return MAX_FOLLOW_RATE * Math.max(1, Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
+	}
+
+	/**
+	 * Speed: how much of the angle still to go the pull closes each tick. Stops at 100, where it
+	 * closes 90% of it: closing more than all of it would overshoot, which reads as shaking.
+	 */
 	private static double gainFor(int percent) {
 		return MAX_GAIN * Mth.clamp(percent, 0, 100) / 100.0;
+	}
+
+	/**
+	 * Speed past 100 - a locked target's only: how many times faster than Strength alone allows
+	 * the pull may turn. Twice at a locked 100%; 1 up to 100, where Speed is the gain alone.
+	 */
+	private static double speedBoost(int percent) {
+		return Math.max(1, Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
 	}
 }

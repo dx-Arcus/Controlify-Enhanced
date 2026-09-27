@@ -21,6 +21,10 @@ import java.util.List;
  * a whole number; distances are blocks. The field names carry those units because these replaced
  * an earlier Low/Medium/High enum, and an old config's "medium" would otherwise sit in a field
  * that now wants a number.
+ * <p>
+ * All sixteen of this record's fields are in use since tl89 added the two lock override switches.
+ * The two snaps nest their six settings each in a {@link SnapConfig}, which is what left room for
+ * them; anything more goes in a section of its own.
  */
 public record AimAssistConfig(
 		AimAssistMode mode,
@@ -32,7 +36,13 @@ public record AimAssistConfig(
 		int bowConeTenths,
 		int bowDistanceBlocks,
 		List<String> customTargets,
-		TargetLockConfig targetLock
+		TargetLockConfig targetLock,
+		boolean swingTiming,
+		SnapConfig meleeSnap,
+		SnapConfig rangedSnap,
+		boolean targetPlayers,
+		boolean lockOverridesMelee,
+		boolean lockOverridesBow
 ) {
 	public static final int MIN_CONE_TENTHS = 5;
 	public static final int MAX_MELEE_CONE_TENTHS = 250;
@@ -51,7 +61,13 @@ public record AimAssistConfig(
 			30,
 			35,
 			List.of(),
-			TargetLockConfig.DEFAULT
+			TargetLockConfig.DEFAULT,
+			false,
+			SnapConfig.MELEE_DEFAULT,
+			SnapConfig.RANGED_DEFAULT,
+			false,
+			true,
+			true
 	);
 
 	public static final Codec<AimAssistConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -64,6 +80,12 @@ public record AimAssistConfig(
 			Codec.intRange(MIN_CONE_TENTHS, MAX_BOW_CONE_TENTHS).optionalFieldOf("bow_cone_tenths", DEFAULT.bowConeTenths()).forGetter(AimAssistConfig::bowConeTenths),
 			Codec.intRange(1, MAX_BOW_DISTANCE).optionalFieldOf("bow_distance_blocks", DEFAULT.bowDistanceBlocks()).forGetter(AimAssistConfig::bowDistanceBlocks),
 			Codec.list(Codec.STRING).optionalFieldOf("custom_targets", DEFAULT.customTargets()).forGetter(AimAssistConfig::customTargets),
-			TargetLockConfig.CODEC.optionalFieldOf("target_lock", DEFAULT.targetLock()).forGetter(AimAssistConfig::targetLock)
+			TargetLockConfig.CODEC.optionalFieldOf("target_lock", DEFAULT.targetLock()).forGetter(AimAssistConfig::targetLock),
+			Codec.BOOL.optionalFieldOf("swing_timing", DEFAULT.swingTiming()).forGetter(AimAssistConfig::swingTiming),
+			SnapConfig.codec(SnapConfig.MELEE_DEFAULT, MAX_MELEE_DISTANCE).optionalFieldOf("melee_snap", DEFAULT.meleeSnap()).forGetter(AimAssistConfig::meleeSnap),
+			SnapConfig.codec(SnapConfig.RANGED_DEFAULT, MAX_BOW_DISTANCE).optionalFieldOf("ranged_snap", DEFAULT.rangedSnap()).forGetter(AimAssistConfig::rangedSnap),
+			Codec.BOOL.optionalFieldOf("target_players", DEFAULT.targetPlayers()).forGetter(AimAssistConfig::targetPlayers),
+			Codec.BOOL.optionalFieldOf("lock_overrides_melee", DEFAULT.lockOverridesMelee()).forGetter(AimAssistConfig::lockOverridesMelee),
+			Codec.BOOL.optionalFieldOf("lock_overrides_bow", DEFAULT.lockOverridesBow()).forGetter(AimAssistConfig::lockOverridesBow)
 	).apply(instance, AimAssistConfig::new));
 }

@@ -6,8 +6,10 @@
  */
 package dev.isxander.controlify.config.settings;
 
+import dev.isxander.controlify.aimassist.LockBindMode;
 import dev.isxander.controlify.aimassist.TargetLockMode;
 import dev.isxander.controlify.config.dto.CompassConfig;
+import dev.isxander.controlify.config.dto.LockBindConfig;
 import dev.isxander.controlify.config.dto.TargetLockConfig;
 import net.minecraft.util.Mth;
 
@@ -15,6 +17,18 @@ import net.minecraft.util.Mth;
 public class TargetLockSettings {
 	public boolean enabled;
 	public TargetLockMode mode;
+
+	/** Which mob the bind picks: the nearest, or the one nearest the crosshair. */
+	public LockBindMode bindMode;
+	/** How far off the crosshair F.O.V Lock can pick a mob, in degrees. */
+	public int fovDegrees;
+	/** How far away F.O.V Lock can pick a mob, in blocks. Separate from Locked Range. */
+	public int fovRangeBlocks;
+	/**
+	 * How close a mob has to be for F.O.V Lock to offer it before any further out, in blocks.
+	 * 0 turns that off.
+	 */
+	public int fovPriorityBlocks;
 
 	/** Whether a target that has been left behind is eventually let go of on its own. */
 	public boolean autoDrop;
@@ -83,6 +97,11 @@ public class TargetLockSettings {
 		this.compassOffsetX = compass.offsetX();
 		this.compassOffsetY = compass.offsetY();
 		this.compassWidth = compass.width();
+		LockBindConfig bind = dto.bind();
+		this.bindMode = bind.mode();
+		this.fovDegrees = bind.fovDegrees();
+		this.fovRangeBlocks = bind.fovRangeBlocks();
+		this.fovPriorityBlocks = bind.fovPriorityBlocks();
 	}
 
 	public static TargetLockSettings defaults() {
@@ -100,7 +119,8 @@ public class TargetLockSettings {
 				enabled, mode, autoDrop, groundRange, flyingRange, resetPercent, dropSeconds,
 				overrideCone, lockedStrengthPercent, lockedRangeBlocks, lockedSpeedPercent,
 				arrowEnabled, arrowColor, markerFloorBlocks,
-				new CompassConfig(compassEnabled, compassColor, compassOffsetX, compassOffsetY, compassWidth)
+				new CompassConfig(compassEnabled, compassColor, compassOffsetX, compassOffsetY, compassWidth),
+				new LockBindConfig(bindMode, fovDegrees, fovRangeBlocks, fovPriorityBlocks)
 		);
 	}
 
