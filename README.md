@@ -23,7 +23,6 @@ Controller aim assist with target lock, a couple of quality-of-life options, and
 **Fixes**
 
 - ["New server detected" toast](#new-server-detected-toast) — only shown when it applies.
-- [Virtual mouse warps](#virtual-mouse-warps) — the controller no longer gets disabled by its own cursor.
 - [One controller counted twice](#one-controller-counted-twice) — a pad Windows reports twice is held once.
 
 **Testing**
@@ -146,10 +145,6 @@ The official mod shows this toast on Realms even though analog movement already 
 <p align="center">
   <img alt="The New server detected toast" src="assets/fork/new-server-toast.png" width="480">
 </p>
-
-### Virtual mouse warps
-
-When Controlify moves your cursor between the real and virtual mouse, 26.3 reports that move back as if you'd touched the mouse. That could loop until Controlify decided the controller was faulty and disabled it, with the cursor jittering and B no longer closing screens. This build ignores the echo of its own cursor moves; anything else still counts as real input.
 
 ### One controller counted twice
 
