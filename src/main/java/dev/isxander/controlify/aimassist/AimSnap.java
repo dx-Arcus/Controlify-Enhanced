@@ -32,6 +32,9 @@ import org.jspecify.annotations.Nullable;
  * uses, whatever Target is set to, with other players as well while Target Players is on -
  * measured the way Crosshair Cone measures, to the nearest edge.
  * <p>
+ * With Trajectory Aim on (tl91), Ranged Snap turns to where the shot has to go to land on that
+ * mob rather than onto the mob itself - the point aim assist then carries on helping onto.
+ * <p>
  * The turn speeds up and slows down rather than jumping: Strength is its top speed, Ramp Up how
  * soon it gets there, Ramp Down how gently it comes in to land ({@link #nextSpeed}). While a snap
  * runs it has the camera to itself, and the rest of aim assist takes over once it lands. Pushing
@@ -110,10 +113,13 @@ public final class AimSnap {
 
 	/**
 	 * Turns the camera one tick's worth towards the target, writing the turn into
-	 * {@code lookImpulse} in place of the look input. Returns false, leaving the impulse alone,
-	 * when no snap is running - including when this tick ended one.
+	 * {@code assistTurn} and clearing the look input in {@code lookImpulse}, which it takes the place
+	 * of (tl92: the turn used to be written over the look input itself, and a zoom's sensitivity
+	 * then scaled it down with the rest). Returns false, leaving both alone, when no snap is
+	 * running - including when this tick ended one.
 	 */
-	static boolean step(LocalPlayer player, AimAssistSettings settings, boolean aimingProjectile, Vector2d lookImpulse) {
+	static boolean step(LocalPlayer player, AimAssistSettings settings, boolean aimingProjectile, Vector2d lookImpulse,
+			Vector2d assistTurn) {
 		Entity snapTarget = target;
 		if (snapTarget == null) {
 			return false;
@@ -132,7 +138,13 @@ public final class AimSnap {
 		lastTick = player.tickCount;
 		ticks++;
 
-		Vec3 toTarget = AimAssist.aimPoint(snapTarget).subtract(player.getEyePosition());
+		// A ranged snap turns to Trajectory Aim's point for the mob - only the locked mob's, with
+		// Lock-On Only on (tl95), the way the hold that takes over from it does.
+		boolean locked = TargetLock.active() && TargetLock.locked() == snapTarget;
+		TrajectoryAim.Setup trajectory = TrajectoryAim.setup(settings, kind == Kind.RANGED, player, false, locked);
+		AimAssist.Heading heading = AimAssist.heading(player, snapTarget,
+				TrajectoryAim.aim(player, snapTarget, trajectory, 0), trajectory, 0);
+		Vec3 toTarget = heading.now();
 		double yawError = Mth.wrapDegrees(AimAssist.yawOf(toTarget) - player.getYRot());
 		double pitchError = AimAssist.pitchOf(toTarget) - player.getXRot();
 		double remaining = Math.hypot(yawError, pitchError);
@@ -149,7 +161,7 @@ public final class AimSnap {
 
 		// How far the target will slide across the view by next tick if both keep moving as they
 		// are - the same estimate aim assist's follow uses.
-		Vec3 nextToTarget = toTarget.add(AimAssist.tickMotion(snapTarget)).subtract(AimAssist.tickMotion(player));
+		Vec3 nextToTarget = heading.next();
 		double yawDrift = Mth.wrapDegrees(AimAssist.yawOf(nextToTarget) - AimAssist.yawOf(toTarget));
 		double pitchDrift = AimAssist.pitchOf(nextToTarget) - AimAssist.pitchOf(toTarget);
 
@@ -157,7 +169,8 @@ public final class AimSnap {
 		Turn turn = turn(yawError, pitchError, yawDrift, pitchDrift, speed,
 				top, top / rampTicks(snap.rampUpPercent), top / rampTicks(snap.rampDownPercent));
 		speed = turn.speed();
-		lookImpulse.set(turn.yaw(), turn.pitch());
+		lookImpulse.set(0, 0);
+		assistTurn.set(turn.yaw(), turn.pitch());
 		return true;
 	}
 

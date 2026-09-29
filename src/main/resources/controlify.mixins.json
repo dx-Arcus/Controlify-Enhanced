@@ -22,6 +22,7 @@
     "core.MouseHandlerMixin",
     "core.SDLEventHandlerMixin",
     "feature.accessibility.LocalPlayerMixin",
+    "feature.anticheat.JoinMultiplayerScreenWarningMixin",
     "feature.bind.GuiAccessor",
     "feature.bind.GuiMixin",
     "feature.bind.HudMixin",

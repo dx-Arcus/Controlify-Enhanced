@@ -39,7 +39,13 @@ public record TargetLockConfig(
 ) {
 	/** Widest a range slider goes. Well past any sensible value, but it costs nothing to allow. */
 	public static final int MAX_RANGE = 500;
-	public static final int MAX_LOCKED_RANGE = 160;
+	/**
+	 * Locked Range, and the F.O.V Range and F.O.V Priority Range that share it, go up to this: 500
+	 * since tl98 (Donny, 29 Sep, with the bow's Distance lifted to 500 in tl96: "lift the locked
+	 * range to 500 as well"), 160 before. With Override Bow Settings on, Locked Range is how far
+	 * the bow's help reaches a locked mob, so the two ceilings belong together.
+	 */
+	public static final int MAX_LOCKED_RANGE = 500;
 	/** Default marker color, as plain RGB. */
 	public static final int DEFAULT_ARROW_COLOR = 0xFF3B30;
 

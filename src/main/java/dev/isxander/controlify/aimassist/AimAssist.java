@@ -39,7 +39,13 @@ import java.util.List;
  * aim still decides the outcome.
  * <p>
  * The snaps in {@link AimSnap} are the exception, and only when switched on: they turn the camera
- * onto a target by themselves, on a swing or on starting to aim.
+ * onto a target by themselves, on a swing or on starting to aim. So is Trajectory Aim
+ * ({@link TrajectoryAim}), for a bow or crossbow: once switched on, it takes the crosshair to where
+ * the shot has to go and holds it there, stick moving or not, as the mob, the player and the draw
+ * move it (tl92) - and keeps that mob for the whole draw, wherever the crosshair is taken, until the
+ * stick is pushed hard away from the point for a quarter of a second, which lets it go (tl93). It
+ * takes a mob only once the player has settled the crosshair on it - the stick eased off, the mob in
+ * the cone for a few ticks - so panning past mobs with the bow drawn takes none of them (tl94).
  */
 public final class AimAssist {
 	/**
@@ -104,6 +110,55 @@ public final class AimAssist {
 	/** How far outside the cone a locked bow target may drift before it is given up. */
 	private static final double BOW_LOCK_TOLERANCE = 1.5;
 
+	/**
+	 * A mob Trajectory Aim is holding the crosshair on is not given up for drifting at all: its point
+	 * can move a good few degrees in a tick - a mob turning round puts the lead on the other side of
+	 * it, a Live draw coming into reach lifts the point away - and the crosshair falling behind it
+	 * was exactly what the hold is for. tl92 let it go three cones out, and Donny watched the assist
+	 * lose a mob it could not keep up with and never try for it again (28 Sep). It is kept for the
+	 * whole draw while it is in range and in sight, and let go only by the player: the look stick
+	 * pushed at least this far of its full travel, away from the point, for {@link #LET_GO_TICKS}
+	 * ticks in a row. Then nothing is picked again until the stick comes back under
+	 * {@link #LET_GO_RELEASE}, so the camera is the player's to move away with. A push short of that
+	 * moves the crosshair a little off the point and the pull holds the rest.
+	 */
+	private static final double LET_GO_PUSH = 0.7;
+	private static final int LET_GO_TICKS = 5;
+	private static final double LET_GO_RELEASE = 0.5;
+
+	/**
+	 * With Trajectory Aim on, a mob the search finds is taken for the hold only once the player has
+	 * settled on it: the look stick under {@link #LET_GO_RELEASE} and the same mob found this many
+	 * ticks in a row (tl94). Donny, 28 Sep 21:58, on a flat world at night: "the bow was getting aim
+	 * compensation and aim assist on random targets while drawing the bow and just panning left and
+	 * right on screen, some of them were far away so the compensation would kick in and throw your
+	 * camera up really high". Panning takes the stick past half, and a mob crossing the cone on the
+	 * way is gone again before four ticks are up; stopping on one takes it in a fifth of a second.
+	 * A locked mob is chosen by the lock and needs no settling; without Trajectory Aim the bow's
+	 * gentle help picks at once, as it always has.
+	 */
+	private static final int PICK_TICKS = 4;
+
+	/**
+	 * The point the crosshair is held on is the one for a tick from now (tl94). The server fires a
+	 * shot with what the client last sent of the player - position, movement and where they were
+	 * looking - and the client sends those once a tick, after its entities have moved for the tick
+	 * and before the frames after the tick turn the camera (Minecraft.tick: handleKeybinds, then
+	 * tickEntities, then LocalPlayer.sendChanges; runTick: the ticks, then the look is applied at
+	 * MouseHandler.handleAccumulatedMovement - read in the 26.3 jar). A release is sent at the top of
+	 * a tick, before that tick's packet, so the server fires it from the packet before: the position
+	 * after that tick's move, that move as the carried motion, and the camera as it stood at the
+	 * start of that tick. That camera is where the look tick before put it: the pull towards the point
+	 * this many ticks on, and the follow carrying it one tick further ({@link #heading}) - two moves
+	 * on from that look tick's view, which is exactly the packet's position and move. Held for now,
+	 * as tl93 did, the camera in each packet was a move behind its position. A mob walking, that is a
+	 * fraction of a degree; a player in the air, whose carried motion changes by 0.08 a tick, or a
+	 * Live draw still rising, it was degrees - the miss Donny saw (28 Sep 21:58, "shots still miss
+	 * most times if you are jumping or falling while you shoot"). What no tick ahead can know is the
+	 * jump itself, and the landing: the first tick of each is a surprise the pull then closes.
+	 */
+	private static final int HOLD_TICKS_AHEAD = 1;
+
 	/** Entity hitboxes are grown by this much when testing whether the crosshair is actually on one. */
 	private static final double RAY_HITBOX_PADDING = 0.3;
 
@@ -127,6 +182,17 @@ public final class AimAssist {
 	private static final double MAX_SWEEP_RATE = 12.0;
 	private static final double SWEEP_FULL_ANGLE = 45.0;
 
+	/**
+	 * With Trajectory Aim on, the crosshair is taken to where the shot has to go and held there
+	 * (tl92, Donny 28 Sep: "be constantly tracking the position for the arrow to hit the mob, and be
+	 * actively moving your crosshair there"). The point moves with every step the mob or the player
+	 * takes and, on Live, with every tick of the draw - the follow carries all of that, and the pull
+	 * closes whatever is left at up to this many degrees a tick at full Strength, in place of the
+	 * tuned cap, which at a degree a tick trailed a Live point by a second. The same rate the sweep
+	 * to a locked mob reaches at full Speed.
+	 */
+	private static final double MAX_TRAJECTORY_RATE = 12.0;
+
 	/** What the assist did on the most recent look tick, for the Dev Functions readout. */
 	public record Debug(@Nullable Entity target, double angle, double multiplier, boolean bowMode, boolean active,
 						Counts counts, AimAssistTargets targets, double pull, boolean locked) {
@@ -145,6 +211,19 @@ public final class AimAssist {
 
 	private static Debug lastDebug = Debug.INACTIVE;
 	private static @Nullable Entity lockedBowTarget;
+	/** Ticks in a row the stick has been pushed hard away from a held point (tl93). */
+	private static int ticksPushingAway;
+	/** A held mob has been let go and the stick not yet eased off, so nothing is picked (tl93). */
+	private static boolean letGo;
+	/** The mob the search has been finding, and for how many ticks in a row, while the player settles on it (tl94). */
+	private static @Nullable Object pendingPick;
+	private static int pendingTicks;
+	/**
+	 * Where the held point was expected to be this tick - last tick's next - and for which mob, so
+	 * the point's own unexpected move can be carried in full (tl94).
+	 */
+	private static @Nullable Vec3 expectedPoint;
+	private static @Nullable Entity expectedTarget;
 	private static Counts lastCounts = new Counts();
 	/** Whether a projectile was being aimed last tick, so Ranged Snap goes off only as aiming starts. */
 	private static boolean wasAimingProjectile;
@@ -161,15 +240,24 @@ public final class AimAssist {
 	 * handler before Controlify's look event fires, so mods listening to that event (Zoomify's
 	 * zoom sensitivity, for one) still scale the result as they always have.
 	 *
-	 * @param swung whether a swing was made this tick - pressed, or by Swing Timing Assist - which
-	 *              is what sets off Melee Snap
+	 * @param assistTurn where the turns the assist makes by itself go - a snap's, and Trajectory
+	 *                   Aim's hold on its point (tl92): the look handler adds them after the event,
+	 *                   so a zoom's sensitivity leaves them whole and they land where they are meant to
+	 * @param stickPush  how far the look stick is pushed, 0 to 1 of its full travel, whatever the
+	 *                   sensitivity makes of it (tl93): a hard push away from a held point is the
+	 *                   player letting the mob go
+	 * @param jumping    whether the jump button is down this tick (tl94): the player's tick, after
+	 *                   this, will make the jump, and Trajectory Aim's point allows for it
+	 * @param swung      whether a swing was made this tick - pressed, or by Swing Timing Assist -
+	 *                   which is what sets off Melee Snap
 	 */
-	public static void apply(Vector2d lookImpulse, boolean swung) {
+	public static void apply(Vector2d lookImpulse, Vector2d assistTurn, double stickPush, boolean jumping, boolean swung) {
 		AimAssistSettings settings = Controlify.instance().config().getSettings().aimAssistSettings();
 		LocalPlayer player = Minecraft.getInstance().player;
+		MotionAverage.tick();
 
 		if (player == null || settings.mode == AimAssistMode.OFF || !settings.mode.canAimAssist()) {
-			lockedBowTarget = null;
+			dropBowTarget();
 			AimSnap.stop();
 			lastDebug = Debug.INACTIVE;
 			return;
@@ -180,7 +268,7 @@ public final class AimAssist {
 
 		// Marker only means exactly that: the lock, the arrow and the compass, and no aim help at all.
 		if (lockRunning && !lock.mode.assistsLockedTarget()) {
-			lockedBowTarget = null;
+			dropBowTarget();
 			AimSnap.stop();
 			lastDebug = Debug.INACTIVE;
 			return;
@@ -189,8 +277,13 @@ public final class AimAssist {
 
 		boolean bowMode = isAimingProjectile(player);
 		if (!bowMode) {
-			lockedBowTarget = null;
+			dropBowTarget();
 		}
+		// Trajectory Aim (tl91) only has a shot to work out while a bow is drawn or a crossbow loaded;
+		// its setup for the tick carries Lag Compensation's allowance too (tl92). With Lock-On Only
+		// on it has a shot to work out only for the locked mob (tl95): with nothing locked it is off,
+		// and the bow's ordinary help onto the mob itself is what the search's mob gets.
+		TrajectoryAim.Setup trajectory = TrajectoryAim.setup(settings, bowMode, player, jumping, heldTarget != null);
 
 		// Melee Snap on a swing, Ranged Snap as aiming starts. While one is turning the camera it has
 		// it to itself; everything below picks up again once it lands.
@@ -202,7 +295,7 @@ public final class AimAssist {
 		if (startedAiming) {
 			AimSnap.start(AimSnap.Kind.RANGED, player, settings, heldTarget);
 		}
-		if (AimSnap.step(player, settings, bowMode, lookImpulse)) {
+		if (AimSnap.step(player, settings, bowMode, lookImpulse, assistTurn)) {
 			Entity snapTarget = AimSnap.target();
 			lastDebug = new Debug(snapTarget, snapTarget == null ? 0 : angleTo(player, snapTarget), 1, bowMode, true,
 					lastCounts, settings.targets, lookImpulse.length(), heldTarget != null);
@@ -232,17 +325,34 @@ public final class AimAssist {
 				return;
 			}
 		} else {
-			target = findTarget(player, settings, cone, range, bowMode);
+			// A mob let go with a hard push stays let go, and nothing else is picked, until the stick
+			// eases off: the camera is the player's to move away with (tl93).
+			if (letGo && stickPush > LET_GO_RELEASE) {
+				lastDebug = new Debug(null, 0, 1, bowMode, true, lastCounts, settings.targets, 0, false);
+				return;
+			}
+			letGo = false;
+			target = findTarget(player, settings, cone, range, bowMode, trajectory);
 			if (target == null) {
+				settled(null, stickPush);
 				lastDebug = new Debug(null, 0, 1, bowMode, true, lastCounts, settings.targets, 0, false);
 				return;
 			}
 			if (bowMode) {
+				// A mob the hold would take is taken only once the player has settled on it (tl94);
+				// the mob already kept for this draw is kept.
+				if (target != lockedBowTarget && trajectory.isOn() && !settled(target, stickPush)) {
+					lastDebug = new Debug(null, 0, 1, bowMode, true, lastCounts, settings.targets, 0, false);
+					return;
+				}
 				lockedBowTarget = target;
 			}
 		}
 
-		double angle = angularOffset(player, target, range);
+		// With Trajectory Aim on, the crosshair is helped onto where the shot has to go rather than
+		// onto the mob, and counts as on it anywhere on the way from the one to the other.
+		TrajectoryAim.Aim aim = TrajectoryAim.aim(player, target, trajectory, HOLD_TICKS_AHEAD);
+		double angle = aim != null ? trajectoryOffset(player, target, range, aim) : angularOffset(player, target, range);
 		// 1 while the crosshair is on the target, easing to 0 at the edge of the cone. The square
 		// root keeps the assist meaningful across most of the cone instead of only dead centre.
 		// A lock set to override the cone holds full strength from any angle, which is the setting
@@ -255,19 +365,26 @@ public final class AimAssist {
 		// slowdown asks how much to resist the camera, and that is a settling aid — it has no
 		// business touching the camera while the crosshair is nowhere near the mob. Sharing the
 		// number meant switching the cone off also capped how fast the player could turn at all.
-		double pullProximity = ignoreCone ? 1 : coneProximity;
+		// Trajectory Aim holds the crosshair on the point the same way: the cone picks the mob, and
+		// from then on the crosshair is taken to the point from wherever it is and kept there, or the
+		// mob's every step and the draw's every tick would ease it out of the cone and the help off.
+		// With a point held there is no slowdown at all (tl93): the pull is what holds the crosshair,
+		// and the stick slowed near the point on top of that - and by the game's own reduced aiming
+		// sensitivity with a bow drawn - was what Donny felt as the aim going sticky while he drew.
+		boolean holdsPoint = aim != null;
+		double pullProximity = ignoreCone || holdsPoint ? 1 : coneProximity;
 		double slowProximity = ignoreCone
 				? Math.sqrt(Mth.clamp(1 - (angle / (TURN_IN_CUSHION * 2)), 0, 1))
-				: coneProximity;
+				: holdsPoint ? 0 : coneProximity;
 
 		double multiplier = 1 - (1 - slowdownFor(strength)) * slowProximity;
-
-		Vec3 toTarget = aimPoint(target).subtract(player.getEyePosition());
 
 		// Where the target sits next tick if everyone keeps moving as they are. The change in bearing
 		// is how fast it is sliding across the view, which is the rate the camera has to match just
 		// to stay pointed at it.
-		Vec3 nextToTarget = toTarget.add(tickMotion(target)).subtract(tickMotion(player));
+		Heading heading = heading(player, target, aim, trajectory, HOLD_TICKS_AHEAD);
+		Vec3 toTarget = heading.now();
+		Vec3 nextToTarget = heading.next();
 		double yawDrift = Mth.wrapDegrees(yawOf(nextToTarget) - yawOf(toTarget));
 		double pitchDrift = pitchOf(nextToTarget) - pitchOf(toTarget);
 		double swing = Math.hypot(yawDrift, pitchDrift);
@@ -280,8 +397,9 @@ public final class AimAssist {
 		double stickStrength = Mth.clamp(lookImpulse.length() / FULL_PULL_INPUT, 0, 1);
 		double trackingStrength = Mth.clamp(swing / FULL_PULL_SWING, 0, 1);
 		// Ignoring the cone means holding the target whatever is happening, including a standoff
-		// where neither the player nor the mob is moving, so the gate comes off entirely.
-		double inputStrength = ignoreCone ? 1 : Math.max(stickStrength, trackingStrength);
+		// where neither the player nor the mob is moving, so the gate comes off entirely. So does
+		// Trajectory Aim: it moves the camera by itself, which is why it is off until switched on.
+		double inputStrength = ignoreCone || holdsPoint ? 1 : Math.max(stickStrength, trackingStrength);
 		double pullCap = pullFor(strength);
 		double gain = useLocked ? gainFor(lockedSpeed) : DEFAULT_GAIN;
 		double pullScale = pullProximity * inputStrength;
@@ -291,6 +409,9 @@ public final class AimAssist {
 		// gain is as high as it can usefully go, more Speed lets the pull itself turn faster instead
 		// (speedBoost) - twice as fast at 100% on the slider.
 		double effectiveCap = useLocked ? pullCap * speedBoost(lockedSpeed) : pullCap;
+		if (holdsPoint) {
+			effectiveCap = Math.max(effectiveCap, trajectoryRateFor(strength));
+		}
 		if (ignoreCone) {
 			double sweepBand = SWEEP_FULL_ANGLE - TURN_IN_CUSHION * 2;
 			double reach = Mth.clamp((angle - TURN_IN_CUSHION * 2) / sweepBand, 0, 1);
@@ -300,6 +421,38 @@ public final class AimAssist {
 
 		double yawError = Mth.wrapDegrees(yawOf(toTarget) - player.getYRot());
 		double pitchError = pitchOf(toTarget) - player.getXRot();
+
+		// The stick pushed hard away from a held point, for long enough to mean it, lets the mob go
+		// (tl93). A locked mob is the lock's to keep; the lock has its own bind for letting go.
+		if (holdsPoint && heldTarget == null) {
+			boolean pushingAway = stickPush >= LET_GO_PUSH && lookImpulse.x * yawError + lookImpulse.y * pitchError < 0;
+			ticksPushingAway = pushingAway ? ticksPushingAway + 1 : 0;
+			if (ticksPushingAway >= LET_GO_TICKS) {
+				dropBowTarget();
+				letGo = true;
+				lastDebug = new Debug(null, angle, 1, bowMode, true, lastCounts, settings.targets, 0, false);
+				return;
+			}
+		} else {
+			ticksPushingAway = 0;
+		}
+
+		// The held point's own move since the last look tick that the follow did not carry - the
+		// jump button seen, a landing, the draw reaching where Live takes over - is carried in full
+		// with the follow below, not left to the pull to close at its gain over several ticks: the
+		// server fires from the camera as each packet has it, and a point that moved for a reason
+		// the client already knows should have the camera on it by the next (tl94). What the pull
+		// closes is what is left: the stick's push, and a mob just taken.
+		double moveYaw = 0;
+		double movePitch = 0;
+		if (holdsPoint && expectedPoint != null && expectedTarget == target) {
+			moveYaw = Mth.wrapDegrees(yawOf(toTarget) - yawOf(expectedPoint));
+			movePitch = pitchOf(toTarget) - pitchOf(expectedPoint);
+			yawError -= moveYaw;
+			pitchError -= movePitch;
+		}
+		expectedPoint = holdsPoint ? nextToTarget : null;
+		expectedTarget = holdsPoint ? target : null;
 
 		// Cap the combined pull rather than each axis: capping them separately let a diagonal
 		// pull reach 1.41x the configured cap, which is why High felt heavier than its number.
@@ -321,11 +474,23 @@ public final class AimAssist {
 		// shortfall and this is exactly zero, so the feel at range is untouched.
 		double follow = bowMode && !useLocked ? BOW_FOLLOW : followFor(strength);
 		double followRate = Math.min(Math.max(0, swing - pullCap) * follow, followCeilingFor(strength)) * pullProximity;
+		// Trajectory Aim's point moves as the bow draws and as the mob moves, and the crosshair moves
+		// with it - all of that movement, up to the follow's ceiling, wherever the crosshair is - so
+		// the pull only has to close how far off the point it is. Strength at 0 still does nothing.
+		double carryYaw = yawDrift;
+		double carryPitch = pitchDrift;
+		double carry = swing;
+		if (holdsPoint) {
+			carryYaw += moveYaw;
+			carryPitch += movePitch;
+			carry = Math.hypot(carryYaw, carryPitch);
+			followRate = strength > 0 ? Math.min(carry, followCeilingFor(strength)) : 0;
+		}
 		double followYaw = 0;
 		double followPitch = 0;
-		if (followRate > 0 && swing > 1.0e-4) {
-			followYaw = yawDrift / swing * followRate;
-			followPitch = pitchDrift / swing * followRate;
+		if (followRate > 0 && carry > 1.0e-4) {
+			followYaw = carryYaw / carry * followRate;
+			followPitch = carryPitch / carry * followRate;
 		}
 
 		// Slowdown should only ever resist aim leaving a target, never aim arriving at one. Scaling
@@ -338,10 +503,43 @@ public final class AimAssist {
 				: 0;
 
 		lookImpulse.mul(Mth.lerp(exemption, multiplier, 1.0));
-		lookImpulse.add(yawPull + followYaw, pitchPull + followPitch);
+		// A held point is the assist's own turn, kept out of the look event's reach; the rest is help
+		// with the player's look, and goes through it as it always has.
+		if (holdsPoint) {
+			assistTurn.add(yawPull + followYaw, pitchPull + followPitch);
+		} else {
+			lookImpulse.add(yawPull + followYaw, pitchPull + followPitch);
+		}
 
 		lastDebug = new Debug(target, angle, multiplier, bowMode, true, lastCounts, settings.targets,
 				Math.hypot(yawPull + followYaw, pitchPull + followPitch), heldTarget != null);
+	}
+
+	/** Forgets the mob chosen for this draw, any letting go in progress, and any settling. */
+	private static void dropBowTarget() {
+		lockedBowTarget = null;
+		letGo = false;
+		ticksPushingAway = 0;
+		settled(null, 0);
+		expectedPoint = null;
+		expectedTarget = null;
+	}
+
+	/**
+	 * Whether the player has settled on {@code pick}, the mob the search found this tick - null for
+	 * none: the stick under {@link #LET_GO_RELEASE}, and the same mob {@link #PICK_TICKS} ticks in a
+	 * row (tl94). The stick pushed past half, or a different mob, starts the count over. Takes any
+	 * object, and nothing of the world, so it can be checked on its own.
+	 */
+	static boolean settled(@Nullable Object pick, double stickPush) {
+		if (pick == null || stickPush > LET_GO_RELEASE) {
+			pendingPick = null;
+			pendingTicks = 0;
+			return false;
+		}
+		pendingTicks = pick == pendingPick ? pendingTicks + 1 : 1;
+		pendingPick = pick;
+		return pendingTicks >= PICK_TICKS;
 	}
 
 	/**
@@ -375,6 +573,40 @@ public final class AimAssist {
 	}
 
 	/**
+	 * Which way the crosshair is being helped: now, and a tick from now if everyone keeps moving as
+	 * they are - the difference between the two is how fast the target is sliding across the view.
+	 * Onto the mob itself, or with Trajectory Aim on - {@code aim} not null - onto where the shot has
+	 * to go, {@code aim} being the point {@code ticksAhead} ticks on ({@link #HOLD_TICKS_AHEAD} for
+	 * the hold, 0 for a snap).
+	 */
+	record Heading(Vec3 now, Vec3 next) {
+	}
+
+	static Heading heading(LocalPlayer player, Entity target, TrajectoryAim.Aim aim, TrajectoryAim.Setup trajectory, int ticksAhead) {
+		if (aim != null) {
+			// A tick from now the bow is drawn further too. Live aim that has only just come into
+			// reach jumps away from the full-draw aim; the pull closes that gap rather than the
+			// camera being carried across it in one tick.
+			TrajectoryAim.Aim next = TrajectoryAim.aim(player, target, trajectory, ticksAhead + 1);
+			return new Heading(aim.direction(),
+					next != null && next.live() == aim.live() ? next.direction() : aim.direction());
+		}
+		Vec3 toTarget = aimPoint(target).subtract(player.getEyePosition());
+		return new Heading(toTarget, toTarget.add(tickMotion(target)).subtract(tickMotion(player)));
+	}
+
+	/** Drawing a bow: using an item that draws the way a bow does. */
+	static boolean isDrawingBow(LocalPlayer player) {
+		if (!player.isUsingItem()) {
+			return false;
+		}
+		return switch (player.getUseItem().getUseAnimation()) {
+			case BOW -> true;
+			default -> false;
+		};
+	}
+
+	/**
 	 * True while the player is lining up a projectile shot: drawing a bow, or holding a loaded
 	 * crossbow. Charging a crossbow is a reload rather than a shot, so it keeps melee assist.
 	 */
@@ -403,14 +635,23 @@ public final class AimAssist {
 		return charged != null && !charged.isEmpty();
 	}
 
-	private static @Nullable Entity findTarget(LocalPlayer player, AimAssistSettings settings, double cone, double range, boolean bowMode) {
+	private static @Nullable Entity findTarget(LocalPlayer player, AimAssistSettings settings, double cone, double range, boolean bowMode,
+			TrajectoryAim.Setup trajectory) {
 		// A target chosen while drawing stays chosen, so a mob wandering across the view can't
-		// steal the assist halfway through a shot.
+		// steal the assist halfway through a shot. With Trajectory Aim holding the crosshair on its
+		// point it is kept for the whole draw, wherever the crosshair is, while it is within Distance
+		// and in sight - the stick pushed hard away is what lets it go (tl93, in apply). Without a
+		// point, as it always was: given up a cone and a half out.
 		if (bowMode && lockedBowTarget != null
 				&& isEligible(player, lockedBowTarget, settings)
-				&& angleTo(player, lockedBowTarget) <= cone * BOW_LOCK_TOLERANCE
 				&& player.hasLineOfSight(lockedBowTarget)) {
-			return lockedBowTarget;
+			if (TrajectoryAim.aim(player, lockedBowTarget, trajectory, HOLD_TICKS_AHEAD) != null) {
+				if (player.getEyePosition().distanceTo(aimPoint(lockedBowTarget)) <= range) {
+					return lockedBowTarget;
+				}
+			} else if (angleTo(player, lockedBowTarget) <= cone * BOW_LOCK_TOLERANCE) {
+				return lockedBowTarget;
+			}
 		}
 
 		Vec3 eye = player.getEyePosition();
@@ -435,7 +676,9 @@ public final class AimAssist {
 				continue;
 			}
 
-			double angle = angularOffset(player, candidate, range);
+			// With Trajectory Aim on, measured to the way from the mob to where its shot has to go.
+			TrajectoryAim.Aim aim = TrajectoryAim.aim(player, candidate, trajectory, HOLD_TICKS_AHEAD);
+			double angle = aim != null ? trajectoryOffset(player, candidate, range, aim) : angularOffset(player, candidate, range);
 			if (counts.bestAngle < 0 || angle < counts.bestAngle) {
 				counts.bestAngle = angle;
 			}
@@ -450,11 +693,14 @@ public final class AimAssist {
 
 			// Whether the look ray actually passes through this hitbox. For bows this beats
 			// "nearest to the crosshair", so a zombie at your elbow can't outrank the skeleton
-			// you are lined up on just by being closer in angle.
-			boolean onTarget = candidate.getBoundingBox()
-					.inflate(RAY_HITBOX_PADDING)
-					.clip(eye, eye.add(view.scale(range)))
-					.isPresent();
+			// you are lined up on just by being closer in angle. With Trajectory Aim on, lined up
+			// means anywhere on the way from the mob to where its shot has to go.
+			boolean onTarget = aim != null
+					? angle == 0
+					: candidate.getBoundingBox()
+							.inflate(RAY_HITBOX_PADDING)
+							.clip(eye, eye.add(view.scale(range)))
+							.isPresent();
 			if (onTarget && distance < underCrosshairDistance) {
 				underCrosshair = candidate;
 				underCrosshairDistance = distance;
@@ -576,6 +822,49 @@ public final class AimAssist {
 		return best;
 	}
 
+	/**
+	 * How far off the crosshair a mob is with Trajectory Aim on: nothing anywhere on the way from the
+	 * mob to where its shot has to go - the arc the crosshair travels from one to the other, as wide
+	 * as the mob - and otherwise the nearer of the two. So Crosshair Cone reaches out from both, and a
+	 * crosshair already on the point, however far above the mob, is still on it.
+	 */
+	static double trajectoryOffset(LocalPlayer player, Entity entity, double range, TrajectoryAim.Aim aim) {
+		double onMob = angularOffset(player, entity, range);
+		if (onMob == 0) {
+			return 0;
+		}
+		Vec3 toMob = aimPoint(entity).subtract(player.getEyePosition());
+		double halfWidth = entity.getBbWidth() / 2 + RAY_HITBOX_PADDING;
+		double distance = toMob.length();
+		double width = distance > halfWidth ? Math.toDegrees(Math.asin(halfWidth / distance)) : 90;
+		double onTheWay = Math.max(0, angleToArc(player.getViewVector(1.0f), toMob, aim.direction()) - width);
+		return Math.min(onMob, onTheWay);
+	}
+
+	/**
+	 * Angle, in degrees, from {@code view} to the nearest point of the shorter arc between two
+	 * directions: straight across to it where {@code view} lies alongside the arc, otherwise to the
+	 * nearer end.
+	 */
+	static double angleToArc(Vec3 view, Vec3 from, Vec3 to) {
+		Vec3 v = view.normalize();
+		Vec3 a = from.normalize();
+		Vec3 b = to.normalize();
+		Vec3 normal = a.cross(b);
+		double sine = normal.length();
+		if (sine < 1.0e-9) {
+			return angleBetween(v, a);
+		}
+		normal = normal.scale(1 / sine);
+		Vec3 alongside = v.subtract(normal.scale(v.dot(normal)));
+		if (alongside.lengthSqr() > 1.0e-12
+				&& a.cross(alongside).dot(normal) >= 0
+				&& alongside.cross(b).dot(normal) >= 0) {
+			return Math.toDegrees(Math.asin(Mth.clamp(Math.abs(v.dot(normal)), 0, 1)));
+		}
+		return Math.min(angleBetween(v, a), angleBetween(v, b));
+	}
+
 	/** Angle between two vectors, in degrees. */
 	private static double angleBetween(Vec3 a, Vec3 b) {
 		double lengths = a.length() * b.length();
@@ -639,5 +928,10 @@ public final class AimAssist {
 	 */
 	private static double speedBoost(int percent) {
 		return Math.max(1, Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
+	}
+
+	/** How fast the pull may take the crosshair to Trajectory Aim's point, in degrees a tick. */
+	private static double trajectoryRateFor(int percent) {
+		return MAX_TRAJECTORY_RATE * Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
 	}
 }

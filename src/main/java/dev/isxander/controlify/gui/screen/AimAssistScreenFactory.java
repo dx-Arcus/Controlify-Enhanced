@@ -9,8 +9,10 @@ package dev.isxander.controlify.gui.screen;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.aimassist.AimAssistMode;
 import dev.isxander.controlify.aimassist.AimAssistTargets;
+import dev.isxander.controlify.aimassist.LagCompensationMode;
 import dev.isxander.controlify.aimassist.LockBindMode;
 import dev.isxander.controlify.aimassist.TargetLockMode;
+import dev.isxander.controlify.aimassist.TrajectoryAimMode;
 import dev.isxander.controlify.config.dto.AimAssistConfig;
 import dev.isxander.controlify.config.dto.CompassConfig;
 import dev.isxander.controlify.config.dto.LockBindConfig;
@@ -99,6 +101,44 @@ public class AimAssistScreenFactory {
 				.build();
 		bindMode.addListener((opt, event) -> fovOptions.forEach(option -> option.setAvailable(opt.pendingValue() == LockBindMode.FOV)));
 
+		// Trajectory Aim (tl91), under Distance in the Bow group at Donny's asking, its Lock-On Only
+		// switch (tl95), Lag Compensation (tl92) and Live Start Angle (tl93): Lock-On Only and Lag
+		// Compensation only mean anything with Trajectory Aim on, Lag Allowance only with Lag
+		// Compensation on Manual, and Live Start Angle only with Trajectory Aim on Live, so each is
+		// greyed out the rest of the time.
+		Option<TrajectoryAimMode> trajectoryAim = Option.<TrajectoryAimMode>createBuilder()
+				.name(Component.translatable("controlify.gui.aim_assist.trajectory_aim"))
+				.description(state -> trajectoryDescription(state))
+				.binding(defaults.trajectoryAim, () -> settings.trajectoryAim, v -> settings.trajectoryAim = v)
+				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(TrajectoryAimMode.class))
+				.build();
+		Option<Boolean> trajectoryLockedOnly = Option.<Boolean>createBuilder()
+				.name(Component.translatable("controlify.gui.aim_assist.trajectory_locked_only"))
+				.description(OptionDescription.of(Component.translatable("controlify.gui.aim_assist.trajectory_locked_only.tooltip")))
+				.binding(defaults.trajectoryLockedOnly, () -> settings.trajectoryLockedOnly, v -> settings.trajectoryLockedOnly = v)
+				.controller(TickBoxControllerBuilder::create)
+				.build();
+		Option<LagCompensationMode> lagCompensation = Option.<LagCompensationMode>createBuilder()
+				.name(Component.translatable("controlify.gui.aim_assist.lag_compensation"))
+				.description(state -> modeDescription("controlify.gui.aim_assist.lag_compensation", state))
+				.binding(defaults.lagCompensation, () -> settings.lagCompensation, v -> settings.lagCompensation = v)
+				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(LagCompensationMode.class))
+				.build();
+		Option<Integer> lagAllowance = slider("controlify.gui.aim_assist.lag_allowance", 0, AimAssistConfig.MAX_LAG_ALLOWANCE_MS, 10, MILLISECONDS,
+				defaults.lagAllowanceMs, () -> settings.lagAllowanceMs, v -> settings.lagAllowanceMs = v);
+		Option<Integer> liveStartAngle = slider("controlify.gui.aim_assist.live_start_angle",
+				AimAssistConfig.MIN_LIVE_START_DEGREES, AimAssistConfig.MAX_LIVE_START_DEGREES, 1, WHOLE_DEGREES,
+				defaults.liveStartDegrees, () -> settings.liveStartDegrees, v -> settings.liveStartDegrees = v);
+		Runnable greyTrajectoryRows = () -> {
+			trajectoryLockedOnly.setAvailable(trajectoryAim.pendingValue().isOn());
+			lagCompensation.setAvailable(trajectoryAim.pendingValue().isOn());
+			lagAllowance.setAvailable(trajectoryAim.pendingValue().isOn() && lagCompensation.pendingValue() == LagCompensationMode.MANUAL);
+			liveStartAngle.setAvailable(trajectoryAim.pendingValue() == TrajectoryAimMode.LIVE);
+		};
+		greyTrajectoryRows.run();
+		trajectoryAim.addEventListener((opt, event) -> greyTrajectoryRows.run());
+		lagCompensation.addEventListener((opt, event) -> greyTrajectoryRows.run());
+
 		return YetAnotherConfigLib.createBuilder()
 				.title(Component.translatable("controlify.gui.aim_assist.title"))
 				.save(() -> Controlify.instance().config().saveSafely())
@@ -181,6 +221,13 @@ public class AimAssistScreenFactory {
 										defaults.bowConeTenths, () -> settings.bowConeTenths, v -> settings.bowConeTenths = v))
 								.option(slider("controlify.gui.aim_assist.distance", 1, AimAssistConfig.MAX_BOW_DISTANCE, 1, BLOCKS,
 										defaults.bowDistanceBlocks, () -> settings.bowDistanceBlocks, v -> settings.bowDistanceBlocks = v))
+								// Under Distance in the Bow group, at Donny's asking (tl91), with Lock-On Only
+								// (tl95), Lag Compensation (tl92) and Live Start Angle (tl93).
+								.option(trajectoryAim)
+								.option(trajectoryLockedOnly)
+								.option(lagCompensation)
+								.option(lagAllowance)
+								.option(liveStartAngle)
 								.build())
 						.build())
 				.category(ConfigCategory.createBuilder()
@@ -321,6 +368,8 @@ public class AimAssistScreenFactory {
 			v -> Component.translatable("controlify.gui.aim_assist.blocks_format", v);
 	private static final IntFunction<Component> SECONDS =
 			v -> Component.translatable("controlify.gui.aim_assist.seconds_format", v);
+	private static final IntFunction<Component> MILLISECONDS =
+			v -> Component.translatable("controlify.gui.aim_assist.milliseconds_format", v);
 	/** Cones are stored in tenths of a degree so half-degree steps survive as whole numbers. */
 	private static final IntFunction<Component> DEGREES =
 			v -> Component.translatable("controlify.gui.aim_assist.degrees_format", String.format("%.1f", v / 10.0));
@@ -389,6 +438,24 @@ public class AimAssistScreenFactory {
 				.text(Component.empty())
 				.text(mode.getDisplayName().copy().withStyle(ChatFormatting.BOLD))
 				.text(Component.translatable(key + "." + mode.getSerializedName() + ".desc"))
+				.build();
+	}
+
+	/**
+	 * Trajectory Aim's description: what it is for, the chosen mode's name as a heading over what
+	 * that mode does, the way the other mode pickers read - and while it is on, in red, the warning
+	 * everything that turns the camera by itself carries.
+	 */
+	private static OptionDescription trajectoryDescription(TrajectoryAimMode mode) {
+		String key = "controlify.gui.aim_assist.trajectory_aim";
+		return OptionDescription.createBuilder()
+				.text(Component.translatable(key + ".tooltip"))
+				.text(Component.empty())
+				.text(mode.getDisplayName().copy().withStyle(ChatFormatting.BOLD))
+				.text(Component.translatable(key + "." + mode.getSerializedName() + ".desc"))
+				.text(mode.isOn()
+						? Component.translatable(key + ".tooltip.warning").withStyle(ChatFormatting.RED)
+						: Component.empty())
 				.build();
 	}
 

@@ -23,6 +23,7 @@ import dev.isxander.controlify.virtualmouse.VirtualMouseHandler;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 
 import java.util.List;
@@ -86,7 +87,13 @@ public class AbstractContainerScreenProcessor<T extends AbstractContainerScreen<
 			}
 
 			if (ControlifyBindings.INV_QUICK_MOVE.on(controller).justPressed()) {
-				clickSlotFunction.clickSlot(hoveredSlot, hoveredSlot.index, 0, ContainerInput.QUICK_MOVE);
+				// Something people keep in the off hand goes there, in your own inventory, while the
+				// off hand is empty (tl91). Anything else is quick moved, as it always was.
+				if (OffhandMove.goesToOffhand(screen, hoveredSlot, minecraft.player)) {
+					clickSlotFunction.clickSlot(hoveredSlot, hoveredSlot.index, Inventory.SLOT_OFFHAND, ContainerInput.SWAP);
+				} else {
+					clickSlotFunction.clickSlot(hoveredSlot, hoveredSlot.index, 0, ContainerInput.QUICK_MOVE);
+				}
 				hapticNavigate();
 			}
 

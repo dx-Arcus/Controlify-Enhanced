@@ -361,14 +361,27 @@ public class InGameInputHandler {
 
 		// Aim assist scales the impulse before the event fires, so listeners (Zoomify's zoom
 		// sensitivity, for instance) still scale whatever the player effectively asked for. A swing,
-		// pressed or made by Swing Timing Assist, is what sets off Melee Snap.
+		// pressed or made by Swing Timing Assist, is what sets off Melee Snap. The turns the assist
+		// makes by itself - a snap's, and Trajectory Aim's hold on its point (tl92) - go in after the
+		// event: they are the assist's, not the player's look, and scaled down under a zoom they
+		// would trail what they are meant to land on.
 		InputBinding attack = ControlifyBindings.ATTACK.on(controller);
 		boolean autoSwing = SwingTiming.tick(attack);
-		AimAssist.apply(lookImpulse, attack.justPressed() || autoSwing);
+		Vector2d assistTurn = new Vector2d();
+		// How far the look stick is pushed, of its full travel, before the curve and the sensitivity
+		// make a turn of it (tl93): a hard push away from a point Trajectory Aim holds lets the mob go,
+		// and that has to mean the same at every sensitivity.
+		double stickPush = Math.min(1.0, Math.hypot(
+				ControlifyBindings.LOOK_RIGHT.on(controller).analogueNow() - ControlifyBindings.LOOK_LEFT.on(controller).analogueNow(),
+				ControlifyBindings.LOOK_DOWN.on(controller).analogueNow() - ControlifyBindings.LOOK_UP.on(controller).analogueNow()));
+		// And whether the jump button is down: this tick's player tick, after the look, makes the jump.
+		boolean jumping = ControlifyBindings.JUMP.on(controller).digitalNow();
+		AimAssist.apply(lookImpulse, assistTurn, stickPush, jumping, attack.justPressed() || autoSwing);
 
 		var modifier = new LookInputModifier(new Vector2f((float) lookImpulse.x, (float) lookImpulse.y), controller);
 		ControlifyEvents.LOOK_INPUT_MODIFIER.invoke(modifier);
 		lookImpulse.set(modifier.lookInput());
+		lookImpulse.add(assistTurn);
 
 		lookInputX = lookImpulse.x;
 		lookInputY = lookImpulse.y;

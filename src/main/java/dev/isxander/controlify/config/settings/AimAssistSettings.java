@@ -8,6 +8,8 @@ package dev.isxander.controlify.config.settings;
 
 import dev.isxander.controlify.aimassist.AimAssistMode;
 import dev.isxander.controlify.aimassist.AimAssistTargets;
+import dev.isxander.controlify.aimassist.LagCompensationMode;
+import dev.isxander.controlify.aimassist.TrajectoryAimMode;
 import dev.isxander.controlify.config.dto.AimAssistConfig;
 
 import java.util.ArrayList;
@@ -30,6 +32,31 @@ public class AimAssistSettings {
 	public int bowStrengthPercent;
 	public int bowConeTenths;
 	public int bowDistanceBlocks;
+	/**
+	 * Trajectory Aim: help a drawn bow or loaded crossbow onto where the shot has to go, rather than
+	 * onto the mob - for a full draw, or for the draw as it is (tl91). Off by default.
+	 */
+	public TrajectoryAimMode trajectoryAim;
+	/**
+	 * Lag Compensation for Trajectory Aim: how much longer a moving mob is taken to keep moving before
+	 * the shot starts - nothing, Lag Allowance as set, or the ping the server reports (tl92). Off by
+	 * default.
+	 */
+	public LagCompensationMode lagCompensation;
+	/** Lag Allowance, in milliseconds, for Manual. */
+	public int lagAllowanceMs;
+	/**
+	 * Live Start Angle, in degrees: Live aims for the draw as it is only once that point has come
+	 * this close to the full-draw point, so the crosshair never makes the big swing a weak early
+	 * draw asks for (tl93).
+	 */
+	public int liveStartDegrees;
+	/**
+	 * Lock-On Only: Trajectory Aim aims only for the mob locked with Lock-On, never for one the
+	 * crosshair cone found; that one gets the bow's ordinary help onto the mob itself. On by
+	 * default (tl95).
+	 */
+	public boolean trajectoryLockedOnly;
 
 	/** Entity type ids ("minecraft:silverfish") used when {@link #targets} is CUSTOM. */
 	public List<String> customTargets;
@@ -65,6 +92,11 @@ public class AimAssistSettings {
 		this.bowStrengthPercent = dto.bowStrengthPercent();
 		this.bowConeTenths = dto.bowConeTenths();
 		this.bowDistanceBlocks = dto.bowDistanceBlocks();
+		this.trajectoryAim = dto.trajectoryAim();
+		this.lagCompensation = dto.lagCompensation();
+		this.lagAllowanceMs = dto.lagAllowanceMs();
+		this.liveStartDegrees = dto.liveStartDegrees();
+		this.trajectoryLockedOnly = dto.trajectoryLockedOnly();
 		this.customTargets = new ArrayList<>(dto.customTargets());
 		this.swingTiming = dto.swingTiming();
 		this.lockOverridesMelee = dto.lockOverridesMelee();
@@ -101,7 +133,12 @@ public class AimAssistSettings {
 				rangedSnap.toDTO(),
 				targetPlayers,
 				lockOverridesMelee,
-				lockOverridesBow
+				lockOverridesBow,
+				trajectoryAim,
+				lagCompensation,
+				lagAllowanceMs,
+				liveStartDegrees,
+				trajectoryLockedOnly
 		);
 	}
 }
