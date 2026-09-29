@@ -22,6 +22,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3fc;
 
+import java.util.stream.IntStream;
+
 /**
  * A strip along the top of the screen showing where the locked mob is by bearing, so it can be
  * found again without sweeping the camera around.
@@ -66,6 +68,9 @@ public final class CompassBarRenderer {
 	private static final int WHITE = 0xFFFFFFFF;
 	/** Candidates are meant to be read past, not read. */
 	private static final int CANDIDATE = 0x70000000;
+
+	/** A cap's post, row by row from CAP_TOP down to CAP_BOTTOM: nine colors, worked out once rather than every frame. */
+	private static final int[] CAP_ROWS = IntStream.range(0, 9).map(row -> lerpColor(CAP_TOP, CAP_BOTTOM, row / 8f)).toArray();
 
 	private CompassBarRenderer() {
 	}
@@ -227,8 +232,7 @@ public final class CompassBarRenderer {
 
 		graphics.fill(post, top, post + 4, top + HEIGHT, OUTLINE);
 		for (int row = 0; row < 9; row++) {
-			graphics.fill(post + 1, top + 1 + row, post + 3, top + 2 + row,
-					lerpColor(CAP_TOP, CAP_BOTTOM, row / 8f));
+			graphics.fill(post + 1, top + 1 + row, post + 3, top + 2 + row, CAP_ROWS[row]);
 		}
 		graphics.fill(post + 1, top + 1, post + 3, top + 2, CAP_LIT);
 		graphics.fill(post + 1, top + 9, post + 3, top + 10, CAP_SHADE);

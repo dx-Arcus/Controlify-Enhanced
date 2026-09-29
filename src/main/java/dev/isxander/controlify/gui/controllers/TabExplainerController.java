@@ -98,6 +98,8 @@ public record TabExplainerController(Option<Component> option) implements Contro
 	public static class Element extends AbstractWidget {
 		private final TabExplainerController control;
 		private Layout layout;
+		/** The width the layout was made for: the one thing it depends on that can change. */
+		private int laidOutWidth = -1;
 		private boolean focused;
 
 		public Element(TabExplainerController control, Dimension<Integer> dim) {
@@ -106,9 +108,18 @@ public record TabExplainerController(Option<Component> option) implements Contro
 			relayout();
 		}
 
-		/** Lays the line out again for the row's width, and makes the row as tall as the band needs. */
+		/**
+		 * Lays the line out for the row's width, and makes the row as tall as the band needs - once
+		 * per width, not every frame: the text and the font never change, so neither does the layout
+		 * until the row is made wider or narrower.
+		 */
 		private void relayout() {
-			layout = TabExplainerController.layout(textRenderer, control.formatValue(), getDimension().width());
+			int width = getDimension().width();
+			if (width == laidOutWidth) {
+				return;
+			}
+			layout = TabExplainerController.layout(textRenderer, control.formatValue(), width);
+			laidOutWidth = width;
 			setDimension(getDimension().withHeight(layout.height()));
 		}
 

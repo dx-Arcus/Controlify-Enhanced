@@ -145,8 +145,10 @@ public final class AimSnap {
 		AimAssist.Heading heading = AimAssist.heading(player, snapTarget,
 				TrajectoryAim.aim(player, snapTarget, trajectory, 0), trajectory, 0);
 		Vec3 toTarget = heading.now();
-		double yawError = Mth.wrapDegrees(AimAssist.yawOf(toTarget) - player.getYRot());
-		double pitchError = AimAssist.pitchOf(toTarget) - player.getXRot();
+		double yawNow = AimAssist.yawOf(toTarget);
+		double pitchNow = AimAssist.pitchOf(toTarget);
+		double yawError = Mth.wrapDegrees(yawNow - player.getYRot());
+		double pitchError = pitchNow - player.getXRot();
 		double remaining = Math.hypot(yawError, pitchError);
 		if (remaining <= LANDED_DEGREES) {
 			stop();
@@ -162,8 +164,8 @@ public final class AimSnap {
 		// How far the target will slide across the view by next tick if both keep moving as they
 		// are - the same estimate aim assist's follow uses.
 		Vec3 nextToTarget = heading.next();
-		double yawDrift = Mth.wrapDegrees(AimAssist.yawOf(nextToTarget) - AimAssist.yawOf(toTarget));
-		double pitchDrift = AimAssist.pitchOf(nextToTarget) - AimAssist.pitchOf(toTarget);
+		double yawDrift = Mth.wrapDegrees(AimAssist.yawOf(nextToTarget) - yawNow);
+		double pitchDrift = AimAssist.pitchOf(nextToTarget) - pitchNow;
 
 		double top = topSpeed(snap.strengthPercent);
 		Turn turn = turn(yawError, pitchError, yawDrift, pitchDrift, speed,

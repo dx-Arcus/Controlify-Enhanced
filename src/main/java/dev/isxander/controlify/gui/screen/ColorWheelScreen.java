@@ -33,6 +33,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
@@ -254,18 +255,50 @@ public class ColorWheelScreen extends Screen {
 		}
 	}
 
-	private void drawWheel(GuiGraphicsExtractor graphics, Wheel wheel) {
-		for (int dy = -WHEEL_RADIUS; dy <= WHEEL_RADIUS; dy += CELL) {
-			for (int dx = -WHEEL_RADIUS; dx <= WHEEL_RADIUS; dx += CELL) {
-				double distance = Math.sqrt(dx * dx + dy * dy);
-				if (distance > WHEEL_RADIUS) {
-					continue;
+	/**
+	 * The disc's cells, worked out once: where each sits relative to the middle, and its hue and
+	 * saturation, which never change - only the brightness they are drawn at does. Row by row from
+	 * the top, left to right, cells outside the rim left out.
+	 */
+	private static final class Cells {
+		static final int[] DX;
+		static final int[] DY;
+		static final float[] HUE;
+		static final float[] SATURATION;
+
+		static {
+			int side = WHEEL_RADIUS * 2 / CELL + 1;
+			int[] dxs = new int[side * side];
+			int[] dys = new int[side * side];
+			float[] hues = new float[side * side];
+			float[] saturations = new float[side * side];
+			int count = 0;
+			for (int dy = -WHEEL_RADIUS; dy <= WHEEL_RADIUS; dy += CELL) {
+				for (int dx = -WHEEL_RADIUS; dx <= WHEEL_RADIUS; dx += CELL) {
+					double distance = Math.sqrt(dx * dx + dy * dy);
+					if (distance > WHEEL_RADIUS) {
+						continue;
+					}
+					dxs[count] = dx;
+					dys[count] = dy;
+					hues[count] = (float) ((Math.toDegrees(Math.atan2(dy, dx)) + 360) % 360 / 360.0);
+					saturations[count] = (float) (distance / WHEEL_RADIUS);
+					count++;
 				}
-				float cellHue = (float) ((Math.toDegrees(Math.atan2(dy, dx)) + 360) % 360 / 360.0);
-				float cellSaturation = (float) (distance / WHEEL_RADIUS);
-				graphics.fill(wheel.wheelX + dx, wheel.wheelY + dy, wheel.wheelX + dx + CELL, wheel.wheelY + dy + CELL,
-						0xFF000000 | hsvToRgb(cellHue, cellSaturation, wheel.value));
 			}
+			DX = Arrays.copyOf(dxs, count);
+			DY = Arrays.copyOf(dys, count);
+			HUE = Arrays.copyOf(hues, count);
+			SATURATION = Arrays.copyOf(saturations, count);
+		}
+	}
+
+	private void drawWheel(GuiGraphicsExtractor graphics, Wheel wheel) {
+		for (int i = 0; i < Cells.DX.length; i++) {
+			int dx = Cells.DX[i];
+			int dy = Cells.DY[i];
+			graphics.fill(wheel.wheelX + dx, wheel.wheelY + dy, wheel.wheelX + dx + CELL, wheel.wheelY + dy + CELL,
+					0xFF000000 | hsvToRgb(Cells.HUE[i], Cells.SATURATION[i], wheel.value));
 		}
 
 		double angle = Math.toRadians(wheel.hue * 360);

@@ -7,6 +7,7 @@
 package dev.isxander.controlify.config.settings;
 
 import dev.isxander.controlify.aimassist.LockBindMode;
+import dev.isxander.controlify.aimassist.PushAwayMode;
 import dev.isxander.controlify.aimassist.TargetLockMode;
 import dev.isxander.controlify.config.dto.CompassConfig;
 import dev.isxander.controlify.config.dto.LockBindConfig;
@@ -29,6 +30,8 @@ public class TargetLockSettings {
 	 * 0 turns that off.
 	 */
 	public int fovPriorityBlocks;
+	/** What a hard push of the look stick away from the locked mob does: nothing, drops the lock, or pauses the help. */
+	public PushAwayMode pushAway;
 
 	/** Whether a target that has been left behind is eventually let go of on its own. */
 	public boolean autoDrop;
@@ -102,6 +105,7 @@ public class TargetLockSettings {
 		this.fovDegrees = bind.fovDegrees();
 		this.fovRangeBlocks = bind.fovRangeBlocks();
 		this.fovPriorityBlocks = bind.fovPriorityBlocks();
+		this.pushAway = bind.pushAway();
 	}
 
 	public static TargetLockSettings defaults() {
@@ -120,7 +124,7 @@ public class TargetLockSettings {
 				overrideCone, lockedStrengthPercent, lockedRangeBlocks, lockedSpeedPercent,
 				arrowEnabled, arrowColor, markerFloorBlocks,
 				new CompassConfig(compassEnabled, compassColor, compassOffsetX, compassOffsetY, compassWidth),
-				new LockBindConfig(bindMode, fovDegrees, fovRangeBlocks, fovPriorityBlocks)
+				new LockBindConfig(bindMode, fovDegrees, fovRangeBlocks, fovPriorityBlocks, pushAway)
 		);
 	}
 

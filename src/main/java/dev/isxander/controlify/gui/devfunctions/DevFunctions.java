@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import java.util.stream.Collectors;
 
 /**
  * Registry of what the "Dev Functions" panel on the right-hand side of Controlify's Global
@@ -75,6 +76,9 @@ public final class DevFunctions {
 	private static final List<DevFunction> FUNCTIONS = new ArrayList<>();
 	private static final List<DevField> FIELDS = new ArrayList<>();
 
+	/** For a button that can always be pressed. */
+	private static final BooleanSupplier ALWAYS = () -> true;
+
 	/** How every XInput device path starts: {@code XInput#0}, {@code XInput#1} and so on. */
 	private static final String XINPUT_PATH_PREFIX = "XInput#";
 
@@ -93,83 +97,19 @@ public final class DevFunctions {
 	private static boolean learnReady = true;
 
 	static {
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.new_server_toast"),
-				Component.translatable("controlify.gui.dev_functions.new_server_toast.tooltip"),
-				() -> true,
-				DevFunctions::showNewServerToast
-		));
+		button("controlify.gui.dev_functions.new_server_toast", ALWAYS, DevFunctions::showNewServerToast);
+		button("controlify.gui.dev_functions.aim_assist_target", DevFunctions::inWorld, DevFunctions::showAimAssistToast);
+		button("controlify.gui.dev_functions.target_lock", DevFunctions::inWorld, DevFunctions::showTargetLockToast);
+		button("controlify.gui.check_movement_type", DevFunctions::inWorld, DevFunctions::showMovementTypeToast);
+		learnButton("controlify.gui.dev_functions.learn_wired", true);
+		learnButton("controlify.gui.dev_functions.learn_wireless", false);
+		button("controlify.gui.dev_functions.controller_connection", ALWAYS, DevFunctions::showConnectionToast);
+		button("controlify.gui.dev_functions.forget_connections", ALWAYS, DevFunctions::forgetConnections);
 
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.aim_assist_target"),
-				Component.translatable("controlify.gui.dev_functions.aim_assist_target.tooltip"),
-				() -> Minecraft.getInstance().player != null,
-				DevFunctions::showAimAssistToast
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.target_lock"),
-				Component.translatable("controlify.gui.dev_functions.target_lock.tooltip"),
-				() -> Minecraft.getInstance().player != null,
-				DevFunctions::showTargetLockToast
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.check_movement_type"),
-				Component.translatable("controlify.gui.check_movement_type.tooltip"),
-				() -> Minecraft.getInstance().player != null,
-				DevFunctions::showMovementTypeToast
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.learn_wired"),
-				Component.translatable("controlify.gui.dev_functions.learn_wired.tooltip"),
-				DevFunctions::canLearn,
-				() -> learnConnection(true),
-				Component.translatable("controlify.gui.dev_functions.learn.wait_name"),
-				Component.translatable("controlify.gui.dev_functions.learn.wait")
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.learn_wireless"),
-				Component.translatable("controlify.gui.dev_functions.learn_wireless.tooltip"),
-				DevFunctions::canLearn,
-				() -> learnConnection(false),
-				Component.translatable("controlify.gui.dev_functions.learn.wait_name"),
-				Component.translatable("controlify.gui.dev_functions.learn.wait")
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.controller_connection"),
-				Component.translatable("controlify.gui.dev_functions.controller_connection.tooltip"),
-				() -> true,
-				DevFunctions::showConnectionToast
-		));
-
-		register(new DevFunction(
-				Component.translatable("controlify.gui.dev_functions.forget_connections"),
-				Component.translatable("controlify.gui.dev_functions.forget_connections.tooltip"),
-				() -> true,
-				DevFunctions::forgetConnections
-		));
-
-		registerField(new DevField(
-				Component.translatable("controlify.gui.dev_functions.marker_floor"),
-				Component.translatable("controlify.gui.dev_functions.marker_floor.tooltip"),
-				TargetLockConfig.MIN_MARKER_FLOOR,
-				TargetLockConfig.MAX_MARKER_FLOOR,
-				() -> targetLock().markerFloorBlocks,
-				value -> targetLock().markerFloorBlocks = value
-		));
-
-		registerField(new DevField(
-				Component.translatable("controlify.gui.dev_functions.color_pointer_speed"),
-				Component.translatable("controlify.gui.dev_functions.color_pointer_speed.tooltip"),
-				DevConfig.MIN_COLOR_POINTER_SPEED,
-				DevConfig.MAX_COLOR_POINTER_SPEED,
-				() -> global().colorPointerSpeed,
-				value -> global().colorPointerSpeed = value
-		));
+		field("controlify.gui.dev_functions.marker_floor", TargetLockConfig.MIN_MARKER_FLOOR, TargetLockConfig.MAX_MARKER_FLOOR,
+				() -> targetLock().markerFloorBlocks, value -> targetLock().markerFloorBlocks = value);
+		field("controlify.gui.dev_functions.color_pointer_speed", DevConfig.MIN_COLOR_POINTER_SPEED, DevConfig.MAX_COLOR_POINTER_SPEED,
+				() -> global().colorPointerSpeed, value -> global().colorPointerSpeed = value);
 	}
 
 	private DevFunctions() {
@@ -191,6 +131,33 @@ public final class DevFunctions {
 		return Collections.unmodifiableList(FIELDS);
 	}
 
+	/** Registers a button named by {@code key}, with {@code key.tooltip} as its tooltip. */
+	private static void button(String key, BooleanSupplier available, Runnable action) {
+		register(new DevFunction(Component.translatable(key), Component.translatable(key + ".tooltip"), available, action));
+	}
+
+	/** Registers a Learn button: greyed out, reading Wait..., while {@link #canLearn} says no. */
+	private static void learnButton(String key, boolean wired) {
+		register(new DevFunction(
+				Component.translatable(key),
+				Component.translatable(key + ".tooltip"),
+				DevFunctions::canLearn,
+				() -> learnConnection(wired),
+				Component.translatable("controlify.gui.dev_functions.learn.wait_name"),
+				Component.translatable("controlify.gui.dev_functions.learn.wait")
+		));
+	}
+
+	/** Registers a field named by {@code key}, with {@code key.tooltip} as its tooltip. */
+	private static void field(String key, int min, int max, IntSupplier get, IntConsumer set) {
+		registerField(new DevField(Component.translatable(key), Component.translatable(key + ".tooltip"), min, max, get, set));
+	}
+
+	/** Whether there is a player to report on. */
+	private static boolean inWorld() {
+		return Minecraft.getInstance().player != null;
+	}
+
 	private static GlobalSettings global() {
 		return Controlify.instance().config().getSettings().globalSettings();
 	}
@@ -208,23 +175,21 @@ public final class DevFunctions {
 	/** Reports what aim assist is doing right now, for tuning the strength and range levels. */
 	private static void showAimAssistToast() {
 		AimAssist.Debug debug = AimAssist.debug();
+		Component mode = Component.translatable(debug.bowMode()
+				? "controlify.gui.aim_assist.bow"
+				: "controlify.gui.aim_assist.melee");
 		Component description;
 		if (!debug.active()) {
 			description = Component.translatable("controlify.toast.aim_assist.inactive");
 		} else if (debug.target() == null) {
+			AimAssist.Counts counts = debug.counts();
 			description = Component.translatable(
 					"controlify.toast.aim_assist.no_target",
 					debug.targets().getDisplayName(),
-					Component.translatable(debug.bowMode()
-							? "controlify.gui.aim_assist.bow"
-							: "controlify.gui.aim_assist.melee"),
-					String.valueOf(debug.counts().nearby),
+					mode,
+					String.valueOf(counts.nearby),
 					String.format("%d eligible, %d far, %d outside cone, %d blocked, best %.1f°",
-							debug.counts().eligible,
-							debug.counts().tooFar,
-							debug.counts().outsideCone,
-							debug.counts().losBlocked,
-							debug.counts().bestAngle)
+							counts.eligible, counts.tooFar, counts.outsideCone, counts.losBlocked, counts.bestAngle)
 			);
 		} else {
 			description = Component.translatable(
@@ -233,19 +198,13 @@ public final class DevFunctions {
 					String.format("%.1f", debug.angle()),
 					String.format("%.0f", debug.multiplier() * 100),
 					String.format("%.2f", debug.pull()),
-					Component.translatable(debug.bowMode()
-							? "controlify.gui.aim_assist.bow"
-							: "controlify.gui.aim_assist.melee")
+					mode
 			);
 		}
 		if (debug.locked()) {
 			description = description.copy().append(Component.translatable("controlify.toast.aim_assist.locked"));
 		}
-		MinecraftUtil.sendToast(
-				Component.translatable("controlify.toast.aim_assist.title"),
-				description,
-				false
-		);
+		MinecraftUtil.sendToast(Component.translatable("controlify.toast.aim_assist.title"), description, false);
 	}
 
 	/** Reports what target lock is holding, and why it would let go. */
@@ -298,19 +257,14 @@ public final class DevFunctions {
 		} else {
 			// Only the paths unique to one side say anything. A path recorded both ways is the
 			// same either way by definition, so it is left out rather than making both true.
-			Set<String> wiredOnly = new LinkedHashSet<>(wired);
-			wiredOnly.removeAll(wireless);
-			Set<String> wirelessOnly = new LinkedHashSet<>(wireless);
-			wirelessOnly.removeAll(wired);
-
 			// Every path attached, not just the one Controlify drives, less XInput's (see
 			// learnable). After a replug Controlify drives the XInput interface, whose path is the
 			// same on a cable and on a receiver; the interface that does change is the GameInput
 			// duplicate it set aside. Reading only the one in use would mean reading a path that
 			// never moves, and the answer could never change.
 			Set<String> now = learnablePaths();
-			boolean looksWired = now.stream().anyMatch(wiredOnly::contains);
-			boolean looksWireless = now.stream().anyMatch(wirelessOnly::contains);
+			boolean looksWired = now.stream().anyMatch(path -> wired.contains(path) && !wireless.contains(path));
+			boolean looksWireless = now.stream().anyMatch(path -> wireless.contains(path) && !wired.contains(path));
 			if (looksWired == looksWireless) {
 				title = Component.translatable("controlify.toast.connection.unclear.title");
 				hint = "controlify.toast.connection.unclear.hint";
@@ -321,13 +275,11 @@ public final class DevFunctions {
 			}
 		}
 
-		StringBuilder detail = new StringBuilder();
-		for (SDLControllerManager.Connection c : connections) {
-			if (!detail.isEmpty()) detail.append('\n');
-			detail.append(c.registered() ? "> " : "  ").append(c.id()).append(' ').append(c.name());
-		}
+		String detail = connections.stream()
+				.map(c -> (c.registered() ? "> " : "  ") + c.id() + ' ' + c.name())
+				.collect(Collectors.joining("\n"));
 		MinecraftUtil.sendToast(title, hint == null
-				? Component.literal(detail.toString())
+				? Component.literal(detail)
 				: Component.translatable(hint).append("\n" + detail), true);
 	}
 
@@ -367,7 +319,7 @@ public final class DevFunctions {
 		// button was pressed last instead makes it the deciding path every time, alternately wrong
 		// in both directions, and pressing the buttons more never settles it. Clearing and starting
 		// again is the way back from a press in the wrong state.
-		Set<String> known = new LinkedHashSet<>(paths(wired ? settings.wiredPaths : settings.wirelessPaths));
+		Set<String> known = paths(wired ? settings.wiredPaths : settings.wirelessPaths);
 		known.addAll(now);
 		String joined = String.join(DevConfig.PATH_SEPARATOR, known);
 		if (wired) {
@@ -470,8 +422,7 @@ public final class DevFunctions {
 
 	/** Shows whether analog or keyboard-like movement is active right now. */
 	private static void showMovementTypeToast() {
-		GlobalSettings globalSettings = Controlify.instance().config().getSettings().globalSettings();
-		boolean keyboardLike = globalSettings.shouldUseKeyboardMovement();
+		boolean keyboardLike = global().shouldUseKeyboardMovement();
 		MinecraftUtil.sendToast(
 				Component.translatable(keyboardLike
 						? "controlify.toast.movement_type.keyboard.title"

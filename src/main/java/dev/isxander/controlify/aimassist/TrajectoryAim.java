@@ -120,6 +120,11 @@ public final class TrajectoryAim {
 		}
 	}
 
+	/** A fully drawn bow's arrow, a crossbow's arrow, and a crossbow's rocket: the three shots that never change. */
+	private static final Shot FULL_BOW = Shot.bow(1);
+	private static final Shot BOLT = new Shot(CROSSBOW_ARROW_SPEED, ARROW_GRAVITY, ARROW_DRAG, ARROW_SPAWN_DROP, false);
+	private static final Shot ROCKET = new Shot(CROSSBOW_ROCKET_SPEED, 0, 1, ROCKET_SPAWN_DROP, false);
+
 	/** Which way to shoot, as a unit direction, and how many ticks the shot takes to get there. */
 	record Launch(double x, double y, double z, double ticks) {
 	}
@@ -197,19 +202,26 @@ public final class TrajectoryAim {
 	}
 
 	/**
-	 * Where to point to land a shot on {@code target} with what {@code player} is aiming - a drawn
-	 * bow, or else a loaded crossbow - or null when Trajectory Aim is off, nothing is being aimed,
-	 * or no shot can reach it. With {@code ticksAhead} at 1, where that will be a tick from now, as
-	 * the bow draws on and everyone keeps moving as they are.
+	 * What is about to be shot, and from where, {@code ticksAhead} ticks on: the full-draw shot, the
+	 * shot for the draw as it will stand then on Live, and the shooter's eyes and movement. None of it
+	 * is about any one mob, so it is read once and every mob in reach measured against it with
+	 * {@link #aim(Draw, Entity, Setup)}, rather than read again for each.
 	 */
-	static @Nullable Aim aim(LocalPlayer player, Entity target, Setup setup, int ticksAhead) {
+	record Draw(Shot full, @Nullable Shot live, Shooter shooter, int ticksAhead) {
+	}
+
+	/**
+	 * The {@link Draw} for this tick with what {@code player} is aiming - a drawn bow, or else a
+	 * loaded crossbow - or null when Trajectory Aim is off or nothing is being aimed.
+	 */
+	static @Nullable Draw draw(LocalPlayer player, Setup setup, int ticksAhead) {
 		if (!setup.isOn()) {
 			return null;
 		}
 		Shot full;
 		Shot live = null;
 		if (AimAssist.isDrawingBow(player)) {
-			full = Shot.bow(1);
+			full = FULL_BOW;
 			if (setup.mode() == TrajectoryAimMode.LIVE) {
 				float power = BowItem.getPowerForTime(player.getTicksUsingItem() + ticksAhead);
 				if ((double) power >= MIN_BOW_POWER) {
@@ -222,18 +234,35 @@ public final class TrajectoryAim {
 				return null;
 			}
 			ChargedProjectiles charged = crossbow.get(DataComponents.CHARGED_PROJECTILES);
-			full = charged != null && charged.contains(Items.FIREWORK_ROCKET)
-					? new Shot(CROSSBOW_ROCKET_SPEED, 0, 1, ROCKET_SPAWN_DROP, false)
-					: new Shot(CROSSBOW_ARROW_SPEED, ARROW_GRAVITY, ARROW_DRAG, ARROW_SPAWN_DROP, false);
+			full = charged != null && charged.contains(Items.FIREWORK_ROCKET) ? ROCKET : BOLT;
 		}
-
-		Vec3 targetMotion = MotionAverage.motion(target);
-		Vec3 lead = TargetLock.isFlying(target) ? targetMotion : new Vec3(targetMotion.x, 0, targetMotion.z);
-		Vec3 middle = startingPoint(target.getBoundingBox().getCenter(), lead, setup.lagTicks(), ticksAhead);
 		Shooter shooter = ahead(player.getEyePosition(), AimAssist.tickMotion(player), player.onGround(),
 				setup.jumping() ? jumpPower(player) : 0, player.getBoundingBox(),
 				(box, dy) -> Entity.collideBoundingBox(player, new Vec3(0, dy, 0), box, player.level(), List.of()).y, ticksAhead);
-		return aimFrom(shooter.eye(), shooter.motion(), shooter.onGround(), 0, middle, lead, live, full, setup.liveStartDegrees());
+		return new Draw(full, live, shooter, ticksAhead);
+	}
+
+	/**
+	 * Where to point to land a shot on {@code target} with what {@code player} is aiming - a drawn
+	 * bow, or else a loaded crossbow - or null when Trajectory Aim is off, nothing is being aimed,
+	 * or no shot can reach it. With {@code ticksAhead} at 1, where that will be a tick from now, as
+	 * the bow draws on and everyone keeps moving as they are.
+	 */
+	static @Nullable Aim aim(LocalPlayer player, Entity target, Setup setup, int ticksAhead) {
+		return aim(draw(player, setup, ticksAhead), target, setup);
+	}
+
+	/** {@link #aim(LocalPlayer, Entity, Setup, int)} for a {@link Draw} already read this tick. */
+	static @Nullable Aim aim(@Nullable Draw draw, Entity target, Setup setup) {
+		if (draw == null) {
+			return null;
+		}
+		Vec3 targetMotion = MotionAverage.motion(target);
+		Vec3 lead = TargetLock.isFlying(target) ? targetMotion : new Vec3(targetMotion.x, 0, targetMotion.z);
+		Vec3 middle = startingPoint(target.getBoundingBox().getCenter(), lead, setup.lagTicks(), draw.ticksAhead());
+		Shooter shooter = draw.shooter();
+		return aimFrom(shooter.eye(), shooter.motion(), shooter.onGround(), 0, middle, lead, draw.live(), draw.full(),
+				setup.liveStartDegrees());
 	}
 
 	/** Where the shooter's eyes will be, how they will be moving, and whether they will be on the ground, some ticks on. */
@@ -334,13 +363,12 @@ public final class TrajectoryAim {
 
 	/** A loaded crossbow in the main hand, or else the off hand - the one a press of use shoots. */
 	private static @Nullable ItemStack loadedCrossbow(LocalPlayer player) {
-		for (ItemStack stack : new ItemStack[]{player.getMainHandItem(), player.getOffhandItem()}) {
-			ChargedProjectiles charged = stack.get(DataComponents.CHARGED_PROJECTILES);
-			if (charged != null && !charged.isEmpty()) {
-				return stack;
-			}
+		ItemStack main = player.getMainHandItem();
+		if (AimAssist.isLoadedCrossbow(main)) {
+			return main;
 		}
-		return null;
+		ItemStack off = player.getOffhandItem();
+		return AimAssist.isLoadedCrossbow(off) ? off : null;
 	}
 
 	/**
@@ -388,12 +416,29 @@ public final class TrajectoryAim {
 		return null;
 	}
 
-	/** How much further the point still is at {@code t} ticks than a shot at this speed can have come: {@code |W(t)| - speed carried(t)}. */
+	/**
+	 * How much further the point still is at {@code t} ticks than a shot at this speed can have come:
+	 * {@code |W(t)| - speed carried(t)}. Runs at every step of a search, so {@link #carried} and
+	 * {@link #dropped} are worked out together here, from one reading of the whole ticks and the
+	 * fraction - the same arithmetic as each on its own.
+	 */
 	private static double shortfall(double t, double dx, double dy, double dz, double ux, double uy, double uz,
 			double sx, double sy, double sz, double speed, double gravity, double drag) {
-		double c = carried(t, drag);
+		int n = (int) Math.floor(t);
+		double part = t - n;
+		double c;
+		double d;
+		if (drag >= 1) {
+			c = t;
+			d = n * (n - 1) / 2.0 + part * n;
+		} else {
+			double kept = kept(drag, n);
+			double whole = (1 - kept) / (1 - drag);
+			c = whole + part * kept;
+			d = ((n - whole) + part * (1 - kept)) / (1 - drag);
+		}
 		double wx = dx + ux * t - sx * c;
-		double wy = dy + uy * t - sy * c + gravity * dropped(t, drag);
+		double wy = dy + uy * t - sy * c + gravity * d;
 		double wz = dz + uz * t - sz * c;
 		return Math.sqrt(wx * wx + wy * wy + wz * wz) - speed * c;
 	}

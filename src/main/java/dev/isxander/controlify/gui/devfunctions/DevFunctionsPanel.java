@@ -66,21 +66,41 @@ public final class DevFunctionsPanel {
 
 	private final int top;
 	private final Frame frame;
-	private final List<Button> buttons = new ArrayList<>();
-	private final List<DevFunctions.DevFunction> buttonFunctions = new ArrayList<>();
-	private final List<Boolean> buttonAvailable = new ArrayList<>();
-	private final List<Description> buttonDescriptions = new ArrayList<>();
-	/** What a button says while it is greyed out; null where it has nothing different to say. */
-	private final List<Description> buttonWaitDescriptions = new ArrayList<>();
-	private final List<AbstractWidget> fieldWidgets = new ArrayList<>();
-	private final List<Description> fieldDescriptions = new ArrayList<>();
+	private final List<Entry> buttons = new ArrayList<>();
+	private final List<Field> fields = new ArrayList<>();
 	private final Button toggle;
 	private final Label toggleLabel;
 	private final Description toggleDescription;
 
+	/** One of the panel's buttons: its function, whether it could be pressed at the last look, and what it says. */
+	private static final class Entry {
+		final Button button;
+		final DevFunctions.DevFunction function;
+		final Description description;
+		/** What the button says while it is greyed out; null where it has nothing different to say. */
+		final @Nullable Description waiting;
+		boolean available;
+
+		Entry(Button button, DevFunctions.DevFunction function) {
+			this.button = button;
+			this.function = function;
+			this.available = function.available().getAsBoolean();
+			this.description = new Description(function.name(), function.tooltip());
+			this.waiting = function.waitTooltip() == null ? null : new Description(function.name(), function.waitTooltip());
+		}
+	}
+
+	/** One of the panel's fields: the box, its label, and the description they share. */
+	private record Field(Label label, NumberField box, Description description) {
+	}
+
 	public static boolean isHost(ConfigCategory category) {
-		return category.name().getContents() instanceof TranslatableContents tc
-				&& HOST_CATEGORY_KEY.equals(tc.getKey());
+		return isKey(category.name(), HOST_CATEGORY_KEY);
+	}
+
+	/** Whether {@code text} is the translation of {@code key}. */
+	private static boolean isKey(Component text, String key) {
+		return text.getContents() instanceof TranslatableContents tc && key.equals(tc.getKey());
 	}
 
 	/**
@@ -108,15 +128,15 @@ public final class DevFunctionsPanel {
 		// panel instead of leaving a half-empty box stretched down to the toggle. Buttons pair up
 		// two to a row where both labels fit, so the count of rows is what decides the height -
 		// not the count of buttons.
-		int rows = planRows(font, paddedWidth - INNER_PADDING * 2).size();
+		List<List<DevFunctions.DevFunction>> rows = planRows(font, paddedWidth - INNER_PADDING * 2);
 		int fields = DevFunctions.fields().size();
 		int contentHeight = INNER_PADDING + font.lineHeight + INNER_PADDING
-				+ rows * BUTTON_HEIGHT + Math.max(0, rows - 1) * BUTTON_SPACING
+				+ rows.size() * BUTTON_HEIGHT + Math.max(0, rows.size() - 1) * BUTTON_SPACING
 				+ (fields > 0 ? BUTTON_SPACING + fields * (FIELD_HEIGHT + BUTTON_SPACING) : 0)
 				+ INNER_PADDING;
 		int bottom = Math.min(top + contentHeight, maxBottom);
 
-		return new DevFunctionsPanel(left, top, paddedWidth, bottom, toggleY, font);
+		return new DevFunctionsPanel(left, top, paddedWidth, bottom, toggleY, font, rows);
 	}
 
 	/**
@@ -155,7 +175,7 @@ public final class DevFunctionsPanel {
 		return font.width(function.name()) + LABEL_INSET * 2 <= halfWidth;
 	}
 
-	private DevFunctionsPanel(int left, int top, int width, int bottom, int toggleY, Font font) {
+	private DevFunctionsPanel(int left, int top, int width, int bottom, int toggleY, Font font, List<List<DevFunctions.DevFunction>> rows) {
 		this.top = top;
 		this.frame = new Frame(left, top, width, bottom - top, font);
 
@@ -163,7 +183,7 @@ public final class DevFunctionsPanel {
 		int buttonWidth = width - INNER_PADDING * 2;
 		int halfWidth = (buttonWidth - COLUMN_GAP) / 2;
 		int y = top + INNER_PADDING + font.lineHeight + INNER_PADDING;
-		for (List<DevFunctions.DevFunction> row : planRows(font, buttonWidth)) {
+		for (List<DevFunctions.DevFunction> row : rows) {
 			if (y + BUTTON_HEIGHT > bottom - INNER_PADDING) {
 				// Not enough room in this window size for more buttons.
 				break;
@@ -175,13 +195,7 @@ public final class DevFunctionsPanel {
 						.pos(paired ? buttonX + column * (halfWidth + COLUMN_GAP) : buttonX, y)
 						.size(paired ? halfWidth : buttonWidth, BUTTON_HEIGHT)
 						.build();
-				buttons.add(button);
-				buttonFunctions.add(function);
-				buttonAvailable.add(function.available().getAsBoolean());
-				buttonDescriptions.add(new Description(function.name(), function.tooltip()));
-				buttonWaitDescriptions.add(function.waitTooltip() == null
-						? null
-						: new Description(function.name(), function.waitTooltip()));
+				buttons.add(new Entry(button, function));
 			}
 			y += BUTTON_HEIGHT + BUTTON_SPACING;
 		}
@@ -190,15 +204,9 @@ public final class DevFunctionsPanel {
 			if (y + FIELD_HEIGHT > bottom - INNER_PADDING) {
 				break;
 			}
-			int boxX = buttonX + buttonWidth - FIELD_BOX_WIDTH;
-			NumberField box = new NumberField(font, boxX, y, FIELD_BOX_WIDTH, FIELD_HEIGHT, field);
-			Label label = new Label(buttonX, y, buttonWidth - FIELD_BOX_WIDTH - FIELD_LABEL_GAP, FIELD_HEIGHT,
-					field.name(), font);
-			Description description = new Description(field.name(), field.tooltip());
-			fieldWidgets.add(label);
-			fieldDescriptions.add(description);
-			fieldWidgets.add(box);
-			fieldDescriptions.add(description);
+			NumberField box = new NumberField(font, buttonX + buttonWidth - FIELD_BOX_WIDTH, y, FIELD_BOX_WIDTH, FIELD_HEIGHT, field);
+			Label label = new Label(buttonX, y, buttonWidth - FIELD_BOX_WIDTH - FIELD_LABEL_GAP, FIELD_HEIGHT, field.name(), font);
+			fields.add(new Field(label, box, new Description(field.name(), field.tooltip())));
 			y += FIELD_HEIGHT + BUTTON_SPACING;
 		}
 
@@ -222,10 +230,10 @@ public final class DevFunctionsPanel {
 	 */
 	public void tick() {
 		boolean changed = false;
-		for (int i = 0; i < buttons.size(); i++) {
-			boolean available = buttonFunctions.get(i).available().getAsBoolean();
-			if (available != buttonAvailable.get(i)) {
-				buttonAvailable.set(i, available);
+		for (Entry entry : buttons) {
+			boolean available = entry.function.available().getAsBoolean();
+			if (available != entry.available) {
+				entry.available = available;
 				changed = true;
 			}
 		}
@@ -237,8 +245,11 @@ public final class DevFunctionsPanel {
 	/** Adds the panel's widgets to the screen, in draw order (frame behind the buttons). */
 	public void visitWidgets(Consumer<AbstractWidget> consumer) {
 		consumer.accept(frame);
-		buttons.forEach(consumer);
-		fieldWidgets.forEach(consumer);
+		buttons.forEach(entry -> consumer.accept(entry.button));
+		for (Field field : fields) {
+			consumer.accept(field.label());
+			consumer.accept(field.box());
+		}
 		consumer.accept(toggle);
 		consumer.accept(toggleLabel);
 	}
@@ -261,23 +272,25 @@ public final class DevFunctionsPanel {
 	 * pane changes the moment the button does.
 	 */
 	public @Nullable Description hovered() {
-		for (int i = 0; i < buttons.size(); i++) {
-			Button button = buttons.get(i);
-			if (button.visible && button.isHoveredOrFocused()) {
-				Description waiting = buttonWaitDescriptions.get(i);
-				return !buttonAvailable.get(i) && waiting != null ? waiting : buttonDescriptions.get(i);
+		for (Entry entry : buttons) {
+			if (under(entry.button)) {
+				return !entry.available && entry.waiting != null ? entry.waiting : entry.description;
 			}
 		}
-		for (int i = 0; i < fieldWidgets.size(); i++) {
-			AbstractWidget widget = fieldWidgets.get(i);
-			if (widget.visible && widget.isHoveredOrFocused()) {
-				return fieldDescriptions.get(i);
+		for (Field field : fields) {
+			if (under(field.label()) || under(field.box())) {
+				return field.description();
 			}
 		}
 		if (toggle.isHoveredOrFocused() || toggleLabel.isHoveredOrFocused()) {
 			return toggleDescription;
 		}
 		return null;
+	}
+
+	/** Whether a shown widget is under the cursor or holds focus. */
+	private static boolean under(AbstractWidget widget) {
+		return widget.visible && widget.isHoveredOrFocused();
 	}
 
 	/** y of the panel's top edge; the description area above is kept above this while the panel is shown. */
@@ -298,21 +311,19 @@ public final class DevFunctionsPanel {
 	private void applyVisibility() {
 		boolean shown = isShown();
 		frame.visible = shown;
-		for (int i = 0; i < buttons.size(); i++) {
-			Button button = buttons.get(i);
-			DevFunctions.DevFunction function = buttonFunctions.get(i);
-			boolean available = buttonAvailable.get(i);
+		for (Entry entry : buttons) {
 			// Invisible and inactive: not drawn, can't be clicked, can't be reached with a controller.
-			button.visible = shown;
-			button.active = shown && available;
+			entry.button.visible = shown;
+			entry.button.active = shown && entry.available;
 			// A greyed-out button says so on its face. Its description only shows while it is hovered
 			// or focused, and a controller cannot focus a greyed-out button at all.
-			button.setMessage(!available && function.waitName() != null ? function.waitName() : function.name());
+			entry.button.setMessage(!entry.available && entry.function.waitName() != null ? entry.function.waitName() : entry.function.name());
 		}
-		for (AbstractWidget widget : fieldWidgets) {
-			widget.visible = shown;
+		for (Field field : fields) {
 			// A Label is never interactive; a box is only typed into while the panel is up.
-			widget.active = shown && widget instanceof EditBox;
+			field.label().visible = shown;
+			field.box().visible = shown;
+			field.box().active = shown;
 		}
 		toggle.setMessage(Component.literal(shown ? "✔" : ""));
 	}
@@ -326,8 +337,7 @@ public final class DevFunctionsPanel {
 		@Nullable Option<?> reference = null;
 		for (OptionGroup group : category.groups()) {
 			for (Option<?> option : group.options()) {
-				if (option.name().getContents() instanceof TranslatableContents tc
-						&& REFERENCE_OPTION_KEY.equals(tc.getKey())) {
+				if (isKey(option.name(), REFERENCE_OPTION_KEY)) {
 					reference = option;
 				}
 			}

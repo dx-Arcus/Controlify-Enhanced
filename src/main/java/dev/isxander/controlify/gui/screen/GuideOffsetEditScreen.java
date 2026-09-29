@@ -16,58 +16,31 @@ import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.gui.guide.GuideRenderer;
 import dev.isxander.controlify.gui.guide.PrecomputedLines;
 import dev.isxander.controlify.utils.MinecraftUtil;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.function.IntConsumer;
 
 /**
  * Lets the player nudge the left/right ingame button guide columns independently, with a
  * live preview rendered using the player's actual bound inputs (real glyph icons and names
  * for a representative set of bindings), at the exact position the real HUD overlay would use.
+ * The controls are {@link OffsetEditorScreen}'s; this lays them out, two clusters side by side.
  */
-public class GuideOffsetEditScreen extends Screen {
-	private static final int STEP = 1;
-	private static final int BUTTON_SIZE = 20;
-	private static final int FOOTER_BUTTON_WIDTH = 150;
+public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	// The real overlay only ever shows a couple of contextually-relevant lines at once, so its
 	// tight betweenLines gap never gets stressed. Here every sample binding is shown together,
 	// and glyph icons commonly render taller than plain text, so give lines extra breathing
 	// room purely for this preview - the real in-game renderer/gap is untouched.
 	private static final int PREVIEW_LINE_SPACING = 14;
 
-	private static final int OFFSET_BOX_WIDTH = 50;
-	private static final int OFFSET_BOX_HEIGHT = 16;
-	private static final int OFFSET_BOX_GAP = 6;
-	private static final int OFFSET_ROW_WIDTH = OFFSET_BOX_WIDTH * 2 + OFFSET_BOX_GAP;
-
-	// A 2x2 of coarse jumps either side of each number box: +5 / -5 over +10 / -10.
-	private static final int STEP_BUTTON_WIDTH = 22;
-	private static final int STEP_BUTTON_HEIGHT = 12;
-	private static final int STEP_BUTTON_GAP = 2;
-	private static final int STEP_BLOCK_WIDTH = STEP_BUTTON_WIDTH * 2 + STEP_BUTTON_GAP;
-	private static final int STEP_BLOCK_HEIGHT = STEP_BUTTON_HEIGHT * 2 + STEP_BUTTON_GAP;
-	/** Gap between a block and the box it drives. */
-	private static final int STEP_BLOCK_MARGIN = 3;
 	/** Gap between the two blocks when they have to go under the boxes instead of beside them. */
 	private static final int STEP_BLOCK_STACKED_GAP = 6;
-
-	private static final int CORNER_BUTTON_WIDTH = 22;
-	private static final int CORNER_BUTTON_HEIGHT = 13;
-	private static final int CORNER_BUTTON_GAP = 2;
-	private static final int CORNER_GRID_WIDTH = CORNER_BUTTON_WIDTH * 2 + CORNER_BUTTON_GAP;
 
 	/** Height reserved above each cluster for its "Left Guides" / "Right Guides" label. */
 	private static final int LABEL_HEIGHT = 14;
@@ -109,7 +82,7 @@ public class GuideOffsetEditScreen extends Screen {
 	private EditBox rightYBox;
 
 	public GuideOffsetEditScreen(Screen parent, GenericControllerSettings.GuideSettings guideSettings, ControllerEntity controller) {
-		super(Component.translatable("controlify.gui.glyph_editor.title"));
+		super(Component.translatable("controlify.gui.glyph_editor.title"), "controlify.gui.glyph_editor");
 		this.parent = parent;
 		this.guideSettings = guideSettings;
 		this.controller = controller;
@@ -189,35 +162,9 @@ public class GuideOffsetEditScreen extends Screen {
 		);
 	}
 
-	/**
-	 * The coarse jump buttons, kept so focus can be told apart from the rest. See
-	 * {@link #setFocused(GuiEventListener)}.
-	 */
-	private final Set<GuiEventListener> stepButtons = new HashSet<>();
-
-	/**
-	 * Vanilla leaves focus on whatever was last clicked, and a focused button is drawn in its lit
-	 * state - so on a block of four small buttons the last one pressed stays lit until something
-	 * else is pressed, which reads as a selection rather than as where the keyboard is. Focus
-	 * landing on one of them from a mouse click is dropped here; focus from the keyboard or a
-	 * controller, which is the case the ring is actually for, is kept.
-	 * <p>
-	 * It has to be done here rather than in the button's own press handler: vanilla runs the press
-	 * first and sets focus afterwards, so anything the handler cleared would be put straight back.
-	 */
-	@Override
-	public void setFocused(@Nullable GuiEventListener focused) {
-		if (focused != null && stepButtons.contains(focused)
-				&& Minecraft.getInstance().getLastInputType().isMouse()) {
-			super.setFocused(null);
-			return;
-		}
-		super.setFocused(focused);
-	}
-
 	@Override
 	protected void init() {
-		stepButtons.clear();
+		clearStepButtons();
 		ClusterLayout layout = clusterLayout();
 
 		Cluster left = layout.left();
@@ -227,13 +174,15 @@ public class GuideOffsetEditScreen extends Screen {
 				left.gridX(), layout.gridY(),
 				() -> leftOffsetY -= STEP, () -> leftOffsetY += STEP,
 				() -> leftOffsetX -= STEP, () -> leftOffsetX += STEP,
-				() -> { leftOffsetX = 0; leftOffsetY = 0; }
+				() -> { leftOffsetX = 0; leftOffsetY = 0; },
+				"controlify.gui.glyph_editor.reset_side"
 		);
 		addDirectionalPad(
 				right.gridX(), layout.gridY(),
 				() -> rightOffsetY -= STEP, () -> rightOffsetY += STEP,
 				() -> rightOffsetX -= STEP, () -> rightOffsetX += STEP,
-				() -> { rightOffsetX = 0; rightOffsetY = 0; }
+				() -> { rightOffsetX = 0; rightOffsetY = 0; },
+				"controlify.gui.glyph_editor.reset_side"
 		);
 
 		int rowY = layout.rowY();
@@ -259,8 +208,8 @@ public class GuideOffsetEditScreen extends Screen {
 		addStepButtons(left.yStepX(), stepY, d -> leftOffsetY -= d);
 		addStepButtons(right.yStepX(), stepY, d -> rightOffsetY -= d);
 
-		addCornerButtons(left.cornerX(), layout.cornerY(), false);
-		addCornerButtons(right.cornerX(), layout.cornerY(), true);
+		addCornerButtons(left.cornerX(), layout.cornerY(), (top, rightEdge) -> snapToCorner(false, top, rightEdge));
+		addCornerButtons(right.cornerX(), layout.cornerY(), (top, rightEdge) -> snapToCorner(true, top, rightEdge));
 
 		int footerY = height - 28;
 		addRenderableWidget(Button.builder(Component.translatable("controlify.gui.glyph_editor.reset_all"), b -> resetAll())
@@ -268,96 +217,6 @@ public class GuideOffsetEditScreen extends Screen {
 				.build());
 		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> commitAndClose())
 				.bounds(width / 2 + 4, footerY, FOOTER_BUTTON_WIDTH, 20)
-				.build());
-	}
-
-	private void addDirectionalPad(int gridX, int gridY, Runnable onUp, Runnable onDown, Runnable onLeft, Runnable onRight, Runnable onReset) {
-		int s = BUTTON_SIZE;
-		addRenderableWidget(Button.builder(Component.literal("▲"), b -> { onUp.run(); syncEditBoxes(); })
-				.bounds(gridX + s, gridY, s, s)
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("◄"), b -> { onLeft.run(); syncEditBoxes(); })
-				.bounds(gridX, gridY + s, s, s)
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("⟲"), b -> { onReset.run(); syncEditBoxes(); })
-				.bounds(gridX + s, gridY + s, s, s)
-				.tooltip(Tooltip.create(Component.translatable("controlify.gui.glyph_editor.reset_side")))
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("►"), b -> { onRight.run(); syncEditBoxes(); })
-				.bounds(gridX + s * 2, gridY + s, s, s)
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("▼"), b -> { onDown.run(); syncEditBoxes(); })
-				.bounds(gridX + s, gridY + s * 2, s, s)
-				.build());
-	}
-
-	/**
-	 * The coarse jumps beside one number box, as a 2x2: +5 and -5 over +10 and -10. Nudging a
-	 * pixel at a time is right for the last few, and hopeless for crossing the screen.
-	 */
-	private void addStepButtons(int x, int y, IntConsumer onStep) {
-		int w = STEP_BUTTON_WIDTH;
-		int h = STEP_BUTTON_HEIGHT;
-		int gap = STEP_BUTTON_GAP;
-		int[][] cells = {{5, 0, 0}, {-5, 1, 0}, {10, 0, 1}, {-10, 1, 1}};
-		for (int[] cell : cells) {
-			int amount = cell[0];
-			Button button = Button.builder(
-							Component.literal(amount > 0 ? "+" + amount : String.valueOf(amount)),
-							b -> { onStep.accept(amount); syncEditBoxes(); })
-					.bounds(x + cell[1] * (w + gap), y + cell[2] * (h + gap), w, h)
-					.build();
-			stepButtons.add(button);
-			addRenderableWidget(button);
-		}
-	}
-
-	/**
-	 * Builds a numeric text-entry box that lets the player type an exact offset instead of
-	 * repeatedly clicking the directional pad. Accepts an empty value or a lone "-" mid-typing
-	 * without touching the underlying offset, only committing once a full number is entered.
-	 */
-	private EditBox createOffsetBox(int x, int y, int initialValue, IntConsumer onChange) {
-		EditBox box = new EditBox(font, x, y, OFFSET_BOX_WIDTH, OFFSET_BOX_HEIGHT, Component.translatable("controlify.gui.glyph_editor.offset_value"));
-		box.setMaxLength(6);
-		box.setValue(String.valueOf(initialValue));
-		box.setResponder(text -> {
-			if (text.isEmpty() || text.equals("-")) {
-				return;
-			}
-			try {
-				onChange.accept(Integer.parseInt(text));
-			} catch (NumberFormatException ignored) {
-				// leave the underlying offset unchanged until a complete number is typed
-			}
-		});
-		return box;
-	}
-
-	/**
-	 * Adds a 2x2 grid of small buttons that instantly snap a side's offset so its preview
-	 * lands flush against the chosen screen corner.
-	 */
-	private void addCornerButtons(int x, int y, boolean rightColumn) {
-		int w = CORNER_BUTTON_WIDTH;
-		int h = CORNER_BUTTON_HEIGHT;
-		int gap = CORNER_BUTTON_GAP;
-
-		addRenderableWidget(Button.builder(Component.literal("⌜"), b -> snapToCorner(rightColumn, true, false))
-				.bounds(x, y, w, h)
-				.tooltip(Tooltip.create(Component.translatable("controlify.gui.glyph_editor.snap_top_left")))
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌝"), b -> snapToCorner(rightColumn, true, true))
-				.bounds(x + w + gap, y, w, h)
-				.tooltip(Tooltip.create(Component.translatable("controlify.gui.glyph_editor.snap_top_right")))
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌞"), b -> snapToCorner(rightColumn, false, false))
-				.bounds(x, y + h + gap, w, h)
-				.tooltip(Tooltip.create(Component.translatable("controlify.gui.glyph_editor.snap_bottom_left")))
-				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌟"), b -> snapToCorner(rightColumn, false, true))
-				.bounds(x + w + gap, y + h + gap, w, h)
-				.tooltip(Tooltip.create(Component.translatable("controlify.gui.glyph_editor.snap_bottom_right")))
 				.build());
 	}
 
@@ -426,7 +285,8 @@ public class GuideOffsetEditScreen extends Screen {
 	 * Keeps the text boxes showing the current offsets after any change made outside of typing
 	 * into them directly (directional pad, per-side reset, reset all, corner snap).
 	 */
-	private void syncEditBoxes() {
+	@Override
+	protected void syncEditBoxes() {
 		if (leftXBox == null) {
 			return; // not yet initialised
 		}

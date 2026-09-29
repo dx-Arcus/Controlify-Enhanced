@@ -11,6 +11,7 @@ import dev.isxander.controlify.aimassist.AimAssistMode;
 import dev.isxander.controlify.aimassist.AimAssistTargets;
 import dev.isxander.controlify.aimassist.LagCompensationMode;
 import dev.isxander.controlify.aimassist.LockBindMode;
+import dev.isxander.controlify.aimassist.PushAwayMode;
 import dev.isxander.controlify.aimassist.TargetLockMode;
 import dev.isxander.controlify.aimassist.TrajectoryAimMode;
 import dev.isxander.controlify.config.dto.AimAssistConfig;
@@ -38,6 +39,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
@@ -72,12 +74,8 @@ public class AimAssistScreenFactory {
 		List<Option<Integer>> dropoutOptions = List.of(groundRange, flyingRange, resetPercent, dropSeconds);
 		dropoutOptions.forEach(option -> option.setAvailable(lock.autoDrop));
 
-		Option<Boolean> autoDrop = Option.<Boolean>createBuilder()
-				.name(Component.translatable("controlify.gui.target_lock.auto_drop"))
-				.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.auto_drop.tooltip")))
-				.binding(lockDefaults.autoDrop, () -> lock.autoDrop, v -> lock.autoDrop = v)
-				.controller(TickBoxControllerBuilder::create)
-				.build();
+		Option<Boolean> autoDrop = tickBox("controlify.gui.target_lock.auto_drop",
+				lockDefaults.autoDrop, () -> lock.autoDrop, v -> lock.autoDrop = v);
 		autoDrop.addListener((opt, event) -> dropoutOptions.forEach(option -> option.setAvailable(opt.pendingValue())));
 
 		// The F.O.V sliders only mean anything in F.O.V Lock, so they are greyed out the rest of the
@@ -92,13 +90,9 @@ public class AimAssistScreenFactory {
 		List<Option<Integer>> fovOptions = List.of(fovAngle, fovRange, fovPriority);
 		fovOptions.forEach(option -> option.setAvailable(lock.bindMode == LockBindMode.FOV));
 
-		Option<LockBindMode> bindMode = Option.<LockBindMode>createBuilder()
-				.name(Component.translatable("controlify.gui.target_lock.bind_mode"))
-				// Described one mode at a time, like Mode above it.
-				.description(state -> modeDescription("controlify.gui.target_lock.bind_mode", state))
-				.binding(lockDefaults.bindMode, () -> lock.bindMode, v -> lock.bindMode = v)
-				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(LockBindMode.class))
-				.build();
+		// Described one mode at a time, like Mode above it.
+		Option<LockBindMode> bindMode = picker("controlify.gui.target_lock.bind_mode", LockBindMode.class,
+				lockDefaults.bindMode, () -> lock.bindMode, v -> lock.bindMode = v);
 		bindMode.addListener((opt, event) -> fovOptions.forEach(option -> option.setAvailable(opt.pendingValue() == LockBindMode.FOV)));
 
 		// Trajectory Aim (tl91), under Distance in the Bow group at Donny's asking, its Lock-On Only
@@ -106,24 +100,13 @@ public class AimAssistScreenFactory {
 		// Compensation only mean anything with Trajectory Aim on, Lag Allowance only with Lag
 		// Compensation on Manual, and Live Start Angle only with Trajectory Aim on Live, so each is
 		// greyed out the rest of the time.
-		Option<TrajectoryAimMode> trajectoryAim = Option.<TrajectoryAimMode>createBuilder()
-				.name(Component.translatable("controlify.gui.aim_assist.trajectory_aim"))
-				.description(state -> trajectoryDescription(state))
-				.binding(defaults.trajectoryAim, () -> settings.trajectoryAim, v -> settings.trajectoryAim = v)
-				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(TrajectoryAimMode.class))
-				.build();
-		Option<Boolean> trajectoryLockedOnly = Option.<Boolean>createBuilder()
-				.name(Component.translatable("controlify.gui.aim_assist.trajectory_locked_only"))
-				.description(OptionDescription.of(Component.translatable("controlify.gui.aim_assist.trajectory_locked_only.tooltip")))
-				.binding(defaults.trajectoryLockedOnly, () -> settings.trajectoryLockedOnly, v -> settings.trajectoryLockedOnly = v)
-				.controller(TickBoxControllerBuilder::create)
-				.build();
-		Option<LagCompensationMode> lagCompensation = Option.<LagCompensationMode>createBuilder()
-				.name(Component.translatable("controlify.gui.aim_assist.lag_compensation"))
-				.description(state -> modeDescription("controlify.gui.aim_assist.lag_compensation", state))
-				.binding(defaults.lagCompensation, () -> settings.lagCompensation, v -> settings.lagCompensation = v)
-				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(LagCompensationMode.class))
-				.build();
+		Option<TrajectoryAimMode> trajectoryAim = picker("controlify.gui.aim_assist.trajectory_aim", TrajectoryAimMode.class,
+				AimAssistScreenFactory::trajectoryDescription,
+				defaults.trajectoryAim, () -> settings.trajectoryAim, v -> settings.trajectoryAim = v);
+		Option<Boolean> trajectoryLockedOnly = tickBox("controlify.gui.aim_assist.trajectory_locked_only",
+				defaults.trajectoryLockedOnly, () -> settings.trajectoryLockedOnly, v -> settings.trajectoryLockedOnly = v);
+		Option<LagCompensationMode> lagCompensation = picker("controlify.gui.aim_assist.lag_compensation", LagCompensationMode.class,
+				defaults.lagCompensation, () -> settings.lagCompensation, v -> settings.lagCompensation = v);
 		Option<Integer> lagAllowance = slider("controlify.gui.aim_assist.lag_allowance", 0, AimAssistConfig.MAX_LAG_ALLOWANCE_MS, 10, MILLISECONDS,
 				defaults.lagAllowanceMs, () -> settings.lagAllowanceMs, v -> settings.lagAllowanceMs = v);
 		Option<Integer> liveStartAngle = slider("controlify.gui.aim_assist.live_start_angle",
@@ -150,24 +133,18 @@ public class AimAssistScreenFactory {
 				.category(ConfigCategory.createBuilder()
 						.name(Component.translatable("controlify.gui.aim_assist.tab.general"))
 						.option(explainer("controlify.gui.aim_assist.tab.general"))
-						.option(Option.<AimAssistMode>createBuilder()
-								.name(Component.translatable("controlify.gui.aim_assist.mode"))
-								.description(state -> OptionDescription.createBuilder()
+						.option(picker("controlify.gui.aim_assist.mode", AimAssistMode.class,
+								state -> OptionDescription.createBuilder()
 										.text(Component.translatable("controlify.gui.aim_assist.mode.tooltip"))
 										.text(state == AimAssistMode.EVERYWHERE
 												? Component.translatable("controlify.gui.aim_assist.mode.tooltip.warning").withStyle(ChatFormatting.RED)
 												: Component.empty())
-										.build())
-								.binding(defaults.mode, () -> settings.mode, v -> settings.mode = v)
-								.controller(opt -> EnumControllerBuilder.create(opt).enumClass(AimAssistMode.class))
-								.build())
+										.build(),
+								defaults.mode, () -> settings.mode, v -> settings.mode = v))
 						.option(Util.make(() -> {
-							Option<AimAssistTargets> targets = Option.<AimAssistTargets>createBuilder()
-									.name(Component.translatable("controlify.gui.aim_assist.targets"))
-									.description(OptionDescription.of(Component.translatable("controlify.gui.aim_assist.targets.tooltip")))
-									.binding(defaults.targets, () -> settings.targets, v -> settings.targets = v)
-									.controller(opt -> EnumControllerBuilder.create(opt).enumClass(AimAssistTargets.class))
-									.build();
+							OptionDescription about = OptionDescription.of(Component.translatable("controlify.gui.aim_assist.targets.tooltip"));
+							Option<AimAssistTargets> targets = picker("controlify.gui.aim_assist.targets", AimAssistTargets.class,
+									state -> about, defaults.targets, () -> settings.targets, v -> settings.targets = v);
 							targets.addListener((opt, event) -> {
 								ButtonOption customList = customListOptRef.get();
 								if (customList != null) {
@@ -178,12 +155,9 @@ public class AimAssistScreenFactory {
 						}))
 						// Its name is red at Donny's asking: this is the switch that turns aim help
 						// on other people.
-						.option(Option.<Boolean>createBuilder()
-								.name(Component.translatable("controlify.gui.aim_assist.target_players").withStyle(ChatFormatting.RED))
-								.description(state -> warned("controlify.gui.aim_assist.target_players", state))
-								.binding(defaults.targetPlayers, () -> settings.targetPlayers, v -> settings.targetPlayers = v)
-								.controller(TickBoxControllerBuilder::create)
-								.build())
+						.option(tickBox(Component.translatable("controlify.gui.aim_assist.target_players").withStyle(ChatFormatting.RED),
+								state -> warned("controlify.gui.aim_assist.target_players", state),
+								defaults.targetPlayers, () -> settings.targetPlayers, v -> settings.targetPlayers = v))
 						.option(Util.make(() -> {
 							ButtonOption customList = ButtonOption.createBuilder()
 									.name(Component.translatable("controlify.gui.aim_assist.custom_list"))
@@ -234,12 +208,8 @@ public class AimAssistScreenFactory {
 						.name(Component.translatable("controlify.gui.aim_assist.tab.snaps"))
 						.option(explainer("controlify.gui.aim_assist.tab.snaps"))
 						// Here rather than under Melee: its swings are what set off Snap on Swing.
-						.option(Option.<Boolean>createBuilder()
-								.name(Component.translatable("controlify.gui.aim_assist.swing_timing"))
-								.description(state -> warned("controlify.gui.aim_assist.swing_timing", state))
-								.binding(defaults.swingTiming, () -> settings.swingTiming, v -> settings.swingTiming = v)
-								.controller(TickBoxControllerBuilder::create)
-								.build())
+						.option(warnedTickBox("controlify.gui.aim_assist.swing_timing",
+								defaults.swingTiming, () -> settings.swingTiming, v -> settings.swingTiming = v))
 						.group(snapGroup("controlify.gui.aim_assist.melee_snap", "controlify.gui.aim_assist.snap_on_swing",
 								settings.meleeSnap, defaults.meleeSnap, AimAssistConfig.MAX_MELEE_DISTANCE))
 						.group(snapGroup("controlify.gui.aim_assist.ranged_snap", "controlify.gui.aim_assist.snap_on_aim",
@@ -251,21 +221,13 @@ public class AimAssistScreenFactory {
 						.group(OptionGroup.createBuilder()
 								.name(Component.translatable("controlify.gui.target_lock"))
 								.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.tooltip")))
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.enabled"))
-										.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.enabled.tooltip")))
-										.binding(lockDefaults.enabled, () -> lock.enabled, v -> lock.enabled = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
-								.option(Option.<TargetLockMode>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.mode"))
-										// Described one mode at a time. All three at once needed line
-										// breaks inside a single translation string, which the lang
-										// loader hands over as literal backslash-n.
-										.description(state -> modeDescription("controlify.gui.target_lock.mode", state))
-										.binding(lockDefaults.mode, () -> lock.mode, v -> lock.mode = v)
-										.controller(opt -> EnumControllerBuilder.create(opt).enumClass(TargetLockMode.class))
-										.build())
+								.option(tickBox("controlify.gui.target_lock.enabled",
+										lockDefaults.enabled, () -> lock.enabled, v -> lock.enabled = v))
+								// Described one mode at a time. All three at once needed line breaks inside a
+								// single translation string, which the lang loader hands over as literal
+								// backslash-n.
+								.option(picker("controlify.gui.target_lock.mode", TargetLockMode.class,
+										lockDefaults.mode, () -> lock.mode, v -> lock.mode = v))
 								.option(bindMode)
 								.option(fovAngle)
 								.option(fovRange)
@@ -279,29 +241,12 @@ public class AimAssistScreenFactory {
 								// Where the Locked settings - the three above and Ignore Crosshair Cone
 								// below - take over: for melee, for the bow, one switch each at Donny's
 								// asking (tl89).
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.override_melee"))
-										.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.override_melee.tooltip")))
-										.binding(defaults.lockOverridesMelee, () -> settings.lockOverridesMelee, v -> settings.lockOverridesMelee = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.override_bow"))
-										.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.override_bow.tooltip")))
-										.binding(defaults.lockOverridesBow, () -> settings.lockOverridesBow, v -> settings.lockOverridesBow = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.override_cone"))
-										.description(state -> OptionDescription.createBuilder()
-												.text(Component.translatable("controlify.gui.target_lock.override_cone.tooltip"))
-												.text(state
-														? Component.translatable("controlify.gui.target_lock.override_cone.tooltip.warning").withStyle(ChatFormatting.RED)
-														: Component.empty())
-												.build())
-										.binding(lockDefaults.overrideCone, () -> lock.overrideCone, v -> lock.overrideCone = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
+								.option(tickBox("controlify.gui.target_lock.override_melee",
+										defaults.lockOverridesMelee, () -> settings.lockOverridesMelee, v -> settings.lockOverridesMelee = v))
+								.option(tickBox("controlify.gui.target_lock.override_bow",
+										defaults.lockOverridesBow, () -> settings.lockOverridesBow, v -> settings.lockOverridesBow = v))
+								.option(warnedTickBox("controlify.gui.target_lock.override_cone",
+										lockDefaults.overrideCone, () -> lock.overrideCone, v -> lock.overrideCone = v))
 								.build())
 						.build())
 				.category(ConfigCategory.createBuilder()
@@ -310,12 +255,8 @@ public class AimAssistScreenFactory {
 						.group(OptionGroup.createBuilder()
 								.name(Component.translatable("controlify.gui.target_lock.marker_compass"))
 								.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.marker_compass.tooltip")))
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.arrow"))
-										.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.arrow.tooltip")))
-										.binding(lockDefaults.arrowEnabled, () -> lock.arrowEnabled, v -> lock.arrowEnabled = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
+								.option(tickBox("controlify.gui.target_lock.arrow",
+										lockDefaults.arrowEnabled, () -> lock.arrowEnabled, v -> lock.arrowEnabled = v))
 								.option(ButtonOption.createBuilder()
 										.name(RainbowText.of(Component.translatable("controlify.gui.target_lock.colors")))
 										.text(RainbowText.of(Component.translatable("controlify.gui.target_lock.colors.button"), 1))
@@ -336,12 +277,8 @@ public class AimAssistScreenFactory {
 																() -> lock.compassColor,
 																v -> lock.compassColor = v)))))
 										.build())
-								.option(Option.<Boolean>createBuilder()
-										.name(Component.translatable("controlify.gui.target_lock.compass"))
-										.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.compass.tooltip")))
-										.binding(lockDefaults.compassEnabled, () -> lock.compassEnabled, v -> lock.compassEnabled = v)
-										.controller(TickBoxControllerBuilder::create)
-										.build())
+								.option(tickBox("controlify.gui.target_lock.compass",
+										lockDefaults.compassEnabled, () -> lock.compassEnabled, v -> lock.compassEnabled = v))
 								.option(ButtonOption.createBuilder()
 										.name(Component.translatable("controlify.gui.target_lock.compass_layout"))
 										.text(Component.translatable("controlify.gui.target_lock.compass_layout.button"))
@@ -352,6 +289,10 @@ public class AimAssistScreenFactory {
 						.group(OptionGroup.createBuilder()
 								.name(Component.translatable("controlify.gui.target_lock.dropout"))
 								.description(OptionDescription.of(Component.translatable("controlify.gui.target_lock.dropout.tooltip")))
+								// What a hard push of the look stick away from the locked mob does (tl104):
+								// described one mode at a time, like the pickers above.
+								.option(picker("controlify.gui.target_lock.push_away", PushAwayMode.class,
+										lockDefaults.pushAway, () -> lock.pushAway, v -> lock.pushAway = v))
 								.option(autoDrop)
 								.option(groundRange)
 								.option(flyingRange)
@@ -398,12 +339,7 @@ public class AimAssistScreenFactory {
 						defaults.rampDownPercent, () -> snap.rampDownPercent, v -> snap.rampDownPercent = v));
 		sliders.forEach(option -> option.setAvailable(snap.enabled));
 
-		Option<Boolean> toggle = Option.<Boolean>createBuilder()
-				.name(Component.translatable(switchKey))
-				.description(state -> warned(switchKey, state))
-				.binding(defaults.enabled, () -> snap.enabled, v -> snap.enabled = v)
-				.controller(TickBoxControllerBuilder::create)
-				.build();
+		Option<Boolean> toggle = warnedTickBox(switchKey, defaults.enabled, () -> snap.enabled, v -> snap.enabled = v);
 		toggle.addEventListener((opt, event) -> sliders.forEach(option -> option.setAvailable(opt.pendingValue())));
 
 		return OptionGroup.createBuilder()
@@ -474,6 +410,45 @@ public class AimAssistScreenFactory {
 				.stateManager(StateManager.createImmutable(text))
 				.customController(TabExplainerController::new)
 				.build();
+	}
+
+	/** A switch: a tick box with its name, its description - fixed, or built from its state - and its binding. */
+	private static Option<Boolean> tickBox(Component name, Function<Boolean, OptionDescription> description,
+			boolean defaultValue, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+		return Option.<Boolean>createBuilder()
+				.name(name)
+				.description(description)
+				.binding(defaultValue, getter, setter)
+				.controller(TickBoxControllerBuilder::create)
+				.build();
+	}
+
+	/** A switch named by {@code key} and described by {@code key.tooltip}. */
+	private static Option<Boolean> tickBox(String key, boolean defaultValue, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+		OptionDescription description = OptionDescription.of(Component.translatable(key + ".tooltip"));
+		return tickBox(Component.translatable(key), state -> description, defaultValue, getter, setter);
+	}
+
+	/** A switch named by {@code key} whose description carries a warning while it is on ({@link #warned}). */
+	private static Option<Boolean> warnedTickBox(String key, boolean defaultValue, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+		return tickBox(Component.translatable(key), state -> warned(key, state), defaultValue, getter, setter);
+	}
+
+	/** A picker for an enum, named by {@code key}, described as given. */
+	private static <E extends Enum<E> & NameableEnum & StringRepresentable> Option<E> picker(String key, Class<E> type,
+			Function<E, OptionDescription> description, E defaultValue, Supplier<E> getter, Consumer<E> setter) {
+		return Option.<E>createBuilder()
+				.name(Component.translatable(key))
+				.description(description)
+				.binding(defaultValue, getter, setter)
+				.controller(opt -> EnumControllerBuilder.create(opt).enumClass(type))
+				.build();
+	}
+
+	/** A picker for a mode, described one mode at a time ({@link #modeDescription}). */
+	private static <E extends Enum<E> & NameableEnum & StringRepresentable> Option<E> picker(String key, Class<E> type,
+			E defaultValue, Supplier<E> getter, Consumer<E> setter) {
+		return picker(key, type, state -> modeDescription(key, state), defaultValue, getter, setter);
 	}
 
 	private static Option<Integer> slider(

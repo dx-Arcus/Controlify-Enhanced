@@ -9,6 +9,7 @@ package dev.isxander.controlify.config.dto;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.isxander.controlify.aimassist.LockBindMode;
+import dev.isxander.controlify.aimassist.PushAwayMode;
 
 /**
  * Serialised Keybind Mode settings: which mob the Lock Target bind picks, and how far F.O.V Lock
@@ -23,12 +24,16 @@ import dev.isxander.controlify.aimassist.LockBindMode;
  * F.O.V Priority Range puts the mobs close by first: F.O.V Lock only offers one further out when
  * nothing within it is in view, however much nearer the crosshair the further one is. 0 turns it
  * off and leaves the angle alone to decide. A config saved without it loads the default.
+ * <p>
+ * Hard Push Away (tl104) lives here too, as the other way a lock is let go of by hand: {@code push_away},
+ * off unless chosen, so a config saved before it loads as every build before did.
  */
 public record LockBindConfig(
 		LockBindMode mode,
 		int fovDegrees,
 		int fovRangeBlocks,
-		int fovPriorityBlocks
+		int fovPriorityBlocks,
+		PushAwayMode pushAway
 ) {
 	/** Anything under a degree would mean the crosshair already has to be on the mob. */
 	public static final int MIN_FOV_DEGREES = 1;
@@ -39,13 +44,15 @@ public record LockBindConfig(
 			LockBindMode.PROXIMITY,
 			15,
 			32,
-			20
+			20,
+			PushAwayMode.OFF
 	);
 
 	public static final Codec<LockBindConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			LockBindMode.CODEC.optionalFieldOf("mode", DEFAULT.mode()).forGetter(LockBindConfig::mode),
 			Codec.intRange(MIN_FOV_DEGREES, MAX_FOV_DEGREES).optionalFieldOf("fov_degrees", DEFAULT.fovDegrees()).forGetter(LockBindConfig::fovDegrees),
 			Codec.intRange(1, TargetLockConfig.MAX_LOCKED_RANGE).optionalFieldOf("fov_range_blocks", DEFAULT.fovRangeBlocks()).forGetter(LockBindConfig::fovRangeBlocks),
-			Codec.intRange(0, TargetLockConfig.MAX_LOCKED_RANGE).optionalFieldOf("fov_priority_blocks", DEFAULT.fovPriorityBlocks()).forGetter(LockBindConfig::fovPriorityBlocks)
+			Codec.intRange(0, TargetLockConfig.MAX_LOCKED_RANGE).optionalFieldOf("fov_priority_blocks", DEFAULT.fovPriorityBlocks()).forGetter(LockBindConfig::fovPriorityBlocks),
+			PushAwayMode.CODEC.optionalFieldOf("push_away", DEFAULT.pushAway()).forGetter(LockBindConfig::pushAway)
 	).apply(instance, LockBindConfig::new));
 }

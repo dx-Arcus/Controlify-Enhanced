@@ -89,6 +89,10 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 	private static final int PILL_HEIGHT = 15;
 	private static final int COLOR_PILL = 0xFFD5342E;
 	private static final int COLOR_PILL_EDGE = 0xFFA82722;
+	/** The pill's label. Measured once, in init, rather than for every ticked row on every frame. */
+	private static final Component TARGETED = Component.translatable("controlify.gui.custom_list.targeted")
+			.withStyle(ChatFormatting.ITALIC);
+	private int pillTextWidth;
 
 	/**
 	 * How far the right stick scrolls the list at full tilt, in pixels a second. A little over
@@ -428,6 +432,7 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 		if (allEntries.isEmpty()) {
 			collectEntries();
 		}
+		pillTextWidth = font.width(TARGETED);
 
 		listWidth = Math.max(MIN_LIST_WIDTH, width - SIDE_MARGIN * 2);
 		listLeft = width / 2 - listWidth / 2;
@@ -942,10 +947,8 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 	 *              the tick box however wide the label ends up in another language
 	 */
 	private void drawTargetedPill(GuiGraphicsExtractor graphics, int right, int top) {
-		Component label = Component.translatable("controlify.gui.custom_list.targeted")
-				.withStyle(ChatFormatting.ITALIC);
-		int textWidth = font.width(label);
-		int left = right - (textWidth + 18);
+		Component label = TARGETED;
+		int left = right - (pillTextWidth + 18);
 		int bottom = top + PILL_HEIGHT;
 
 		// Three inset bands make a capsule out of nothing but rectangles.

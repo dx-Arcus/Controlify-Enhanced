@@ -12,6 +12,8 @@ import dev.isxander.controlify.config.settings.AimAssistSettings;
 import dev.isxander.controlify.config.settings.TargetLockSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -24,9 +26,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.ToDoubleFunction;
 
@@ -49,16 +49,17 @@ public final class TargetLock {
 	/**
 	 * Vanilla flyers whose movement doesn't go through flying navigation or a flying move control,
 	 * so the checks below wouldn't catch them. Modded flyers are caught by those checks instead,
-	 * which is why this is a backstop rather than the whole answer.
+	 * which is why this is a backstop rather than the whole answer. Kept as the registry's own keys,
+	 * so asking about a mob compares its key rather than building its name.
 	 */
-	private static final Set<String> KNOWN_FLYERS = Set.of(
-			"minecraft:ghast",
-			"minecraft:happy_ghast",
-			"minecraft:phantom",
-			"minecraft:blaze",
-			"minecraft:ender_dragon",
-			"minecraft:wither",
-			"minecraft:bat"
+	private static final Set<Identifier> KNOWN_FLYERS = Set.of(
+			Identifier.withDefaultNamespace("ghast"),
+			Identifier.withDefaultNamespace("happy_ghast"),
+			Identifier.withDefaultNamespace("phantom"),
+			Identifier.withDefaultNamespace("blaze"),
+			Identifier.withDefaultNamespace("ender_dragon"),
+			Identifier.withDefaultNamespace("wither"),
+			Identifier.withDefaultNamespace("bat")
 	);
 
 	private static @Nullable Entity locked;
@@ -459,6 +460,12 @@ public final class TargetLock {
 		List<Entity> onScreen = new ArrayList<>();
 		List<Entity> offScreen = new ArrayList<>();
 
+		// The screen's edges, in degrees from the crosshair: the same for every mob this tick.
+		Minecraft minecraft = Minecraft.getInstance();
+		double verticalFov = minecraft.options.fov().get();
+		double aspect = Math.max(1.0, (double) minecraft.getWindow().getWidth() / minecraft.getWindow().getHeight());
+		double horizontalFov = 2 * Math.toDegrees(Math.atan(Math.tan(Math.toRadians(verticalFov / 2)) * aspect));
+
 		for (Entity entity : player.level().getEntities(player, searchBox,
 				entity -> AimAssist.isEligible(player, entity, aimAssist))) {
 			if (player.distanceTo(entity) > searchRange) {
@@ -470,7 +477,7 @@ public final class TargetLock {
 			if (entity.isVehicle()) {
 				continue;
 			}
-			(isOnScreen(player, entity) ? onScreen : offScreen).add(entity);
+			(isOnScreen(player, entity, horizontalFov, verticalFov) ? onScreen : offScreen).add(entity);
 		}
 
 		List<Entity> chosen = onScreen.isEmpty() ? offScreen : onScreen;
@@ -494,9 +501,7 @@ public final class TargetLock {
 		}
 
 		AABB searchBox = player.getBoundingBox().inflate(searchRange);
-		List<Entity> inView = new ArrayList<>();
-		Map<Entity, Double> offsets = new IdentityHashMap<>();
-		Map<Entity, Double> distances = new IdentityHashMap<>();
+		List<Seen> seen = new ArrayList<>();
 
 		for (Entity entity : player.level().getEntities(player, searchBox,
 				entity -> AimAssist.isEligible(player, entity, aimAssist))) {
@@ -512,13 +517,19 @@ public final class TargetLock {
 			if (offset > settings.fovDegrees) {
 				continue;
 			}
-			offsets.put(entity, offset);
-			distances.put(entity, distance);
-			inView.add(entity);
+			seen.add(new Seen(entity, offset, distance));
 		}
 
-		inView.sort(inViewOrder(offsets::get, distances::get, settings.fovPriorityBlocks));
+		seen.sort(inViewOrder(Seen::offset, Seen::distance, settings.fovPriorityBlocks));
+		List<Entity> inView = new ArrayList<>(seen.size());
+		for (Seen candidate : seen) {
+			inView.add(candidate.entity());
+		}
 		return capped(inView);
+	}
+
+	/** A mob in view, with how far off the crosshair and how far away it is, for {@link #inViewOrder}. */
+	private record Seen(Entity entity, double offset, double distance) {
 	}
 
 	/**
@@ -542,12 +553,7 @@ public final class TargetLock {
 	}
 
 	/** Whether the mob is inside the player's actual field of view, horizontally and vertically. */
-	private static boolean isOnScreen(LocalPlayer player, Entity entity) {
-		Minecraft minecraft = Minecraft.getInstance();
-		double verticalFov = minecraft.options.fov().get();
-		double aspect = Math.max(1.0, (double) minecraft.getWindow().getWidth() / minecraft.getWindow().getHeight());
-		double horizontalFov = 2 * Math.toDegrees(Math.atan(Math.tan(Math.toRadians(verticalFov / 2)) * aspect));
-
+	private static boolean isOnScreen(LocalPlayer player, Entity entity, double horizontalFov, double verticalFov) {
 		Vec3 toTarget = entity.getBoundingBox().getCenter().subtract(player.getEyePosition());
 		double horizontal = Math.sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
 		double yawOffset = Math.abs(Mth.wrapDegrees(Math.toDegrees(Math.atan2(-toTarget.x, toTarget.z)) - player.getYRot()));
@@ -570,7 +576,7 @@ public final class TargetLock {
 				return true;
 			}
 		}
-		if (KNOWN_FLYERS.contains(AimAssist.typeId(entity))) {
+		if (KNOWN_FLYERS.contains(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()))) {
 			return true;
 		}
 		return entity.isNoGravity() && !entity.onGround();

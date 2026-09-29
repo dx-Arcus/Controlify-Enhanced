@@ -28,6 +28,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3fc;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Draws a marker over whatever target lock is holding.
  * <p>
@@ -231,6 +234,25 @@ public final class TargetLockRenderer {
 	private static final int FULL_BRIGHT = 0xF000F0;
 
 	/**
+	 * One corner of a face before the spin: where it sits, its texture coordinate, and how far down
+	 * towards the point it is - all of it fixed, so it is worked out once.
+	 */
+	private record Corner(double x, double y, double z, float u, float v, float tipShade) {
+	}
+
+	/** One face of the marker before the spin: which way it faces, and its four corners in order. */
+	private record Face(double nx, double ny, double nz, Corner[] corners) {
+	}
+
+	/**
+	 * The marker's geometry, laid out once. Only the spin, the light it catches and the color change
+	 * from frame to frame, so a frame turns these rather than building the solid again: the first
+	 * version laid out every face, its texture coordinates and its shading on every frame, some three
+	 * hundred small arrays each time.
+	 */
+	private static final Face[] FACES = layOut();
+
+	/**
 	 * Hands the marker to the game as geometry in the world, in the same pass the mobs themselves
 	 * are drawn in.
 	 * <p>
@@ -320,28 +342,59 @@ public final class TargetLockRenderer {
 		double cos = Math.cos(spin);
 		double sin = Math.sin(spin);
 
+		// Every face goes out twice, wound both ways (see above). Corners and normal are turned here,
+		// as the marker spins: that way the texture and the shading stay put on the shape, and the
+		// light stays put in the world, so the sides catch it in turn as they come round.
+		for (Face face : FACES) {
+			float lambert = (float) (LAMBERT_MIN + (1 - LAMBERT_MIN)
+					* Math.max(0, turnX(face.nx(), face.nz(), cos, sin) * LIGHT.x + face.ny() * LIGHT.y + turnZ(face.nx(), face.nz(), cos, sin) * LIGHT.z));
+			float normalX = (float) turnX(face.nx(), face.nz(), cos, sin);
+			float normalY = (float) face.ny();
+			float normalZ = (float) turnZ(face.nx(), face.nz(), cos, sin);
+
+			for (int pass = 0; pass < 2; pass++) {
+				for (int step = 0; step < 4; step++) {
+					Corner corner = face.corners()[pass == 0 ? step : 3 - step];
+					consumer.addVertex(pose,
+									(float) turnX(corner.x(), corner.z(), cos, sin),
+									(float) corner.y(),
+									(float) turnZ(corner.x(), corner.z(), cos, sin))
+							.setColor(0xFF000000 | shade(rgb, lambert * corner.tipShade()))
+							.setUv(corner.u(), corner.v())
+							.setOverlay(OverlayTexture.NO_OVERLAY)
+							.setLight(FULL_BRIGHT)
+							.setNormal(pose, normalX, normalY, normalZ);
+				}
+			}
+		}
+	}
+
+	/** The marker's faces, ring by ring from the top face down to the point, in the order they are sent. */
+	private static Face[] layOut() {
+		List<Face> faces = new ArrayList<>();
 		for (int level = 0; level < RINGS; level++) {
 			double outer = TOP_RADIUS * (RINGS - level) / RINGS;
 			double inner = TOP_RADIUS * (RINGS - level - 1) / RINGS;
 			double bottom = (RINGS - 1 - level) * LEVEL_HEIGHT;
 			double top = bottom + LEVEL_HEIGHT;
 
-			walls(pose, consumer, rgb, cos, sin, outer, bottom, top, 1);
+			walls(faces, outer, bottom, top, 1);
 			if (inner > 1.0e-6) {
-				walls(pose, consumer, rgb, cos, sin, inner, bottom, top, -1);
-				tread(pose, consumer, rgb, cos, sin, outer, inner, top, 1);
-				tread(pose, consumer, rgb, cos, sin, outer, inner, bottom, -1);
+				walls(faces, inner, bottom, top, -1);
+				tread(faces, outer, inner, top, 1);
+				tread(faces, outer, inner, bottom, -1);
 			} else {
-				face(pose, consumer, rgb, cos, sin,
+				face(faces,
 						new double[]{-outer, outer, outer, -outer},
 						new double[]{top, top, top, top},
 						new double[]{-outer, -outer, outer, outer}, 0, 1, 0);
-				face(pose, consumer, rgb, cos, sin,
+				face(faces,
 						new double[]{-outer, outer, outer, -outer},
 						new double[]{bottom, bottom, bottom, bottom},
 						new double[]{-outer, -outer, outer, outer}, 0, -1, 0);
 			}
 		}
+		return faces.toArray(new Face[0]);
 	}
 
 	/**
@@ -349,19 +402,18 @@ public final class TargetLockRenderer {
 	 *
 	 * @param facing 1 for the outside of the ring, -1 for the wall of the cavity
 	 */
-	private static void walls(PoseStack.Pose pose, VertexConsumer consumer, int rgb, double cos, double sin,
-			double radius, double bottom, double top, int facing) {
+	private static void walls(List<Face> faces, double radius, double bottom, double top, int facing) {
 		double r = radius;
-		face(pose, consumer, rgb, cos, sin,
+		face(faces,
 				new double[]{r, r, r, r}, new double[]{bottom, bottom, top, top},
 				new double[]{-r, r, r, -r}, facing, 0, 0);
-		face(pose, consumer, rgb, cos, sin,
+		face(faces,
 				new double[]{-r, -r, -r, -r}, new double[]{bottom, bottom, top, top},
 				new double[]{r, -r, -r, r}, -facing, 0, 0);
-		face(pose, consumer, rgb, cos, sin,
+		face(faces,
 				new double[]{r, -r, -r, r}, new double[]{bottom, bottom, top, top},
 				new double[]{r, r, r, r}, 0, 0, facing);
-		face(pose, consumer, rgb, cos, sin,
+		face(faces,
 				new double[]{-r, r, r, -r}, new double[]{bottom, bottom, top, top},
 				new double[]{-r, -r, -r, -r}, 0, 0, -facing);
 	}
@@ -371,8 +423,7 @@ public final class TargetLockRenderer {
 	 * from outside looking down, or from inside looking up. Four strips, laid out so they meet edge
 	 * to edge without overlapping.
 	 */
-	private static void tread(PoseStack.Pose pose, VertexConsumer consumer, int rgb, double cos, double sin,
-			double outer, double inner, double y, int facing) {
+	private static void tread(List<Face> faces, double outer, double inner, double y, int facing) {
 		double[][] strips = {
 				{-outer, outer, inner, outer},
 				{-outer, outer, -outer, -inner},
@@ -380,52 +431,30 @@ public final class TargetLockRenderer {
 				{-outer, -inner, -inner, inner},
 		};
 		for (double[] s : strips) {
-			face(pose, consumer, rgb, cos, sin,
+			face(faces,
 					new double[]{s[0], s[1], s[1], s[0]},
 					new double[]{y, y, y, y},
 					new double[]{s[2], s[2], s[3], s[3]}, 0, facing, 0);
 		}
 	}
 
-	/**
-	 * One face, sent twice with its corners reversed the second time.
-	 * <p>
-	 * Corners and normal both arrive unturned, and the turn is applied here: that way the texture
-	 * and the shading stay put on the shape while it spins, and the light stays put in the world,
-	 * so the sides catch it in turn as they come round.
-	 */
-	private static void face(PoseStack.Pose pose, VertexConsumer consumer, int rgb, double cos, double sin,
-			double[] xs, double[] ys, double[] zs, double nx, double ny, double nz) {
-		float lambert = (float) (LAMBERT_MIN + (1 - LAMBERT_MIN)
-				* Math.max(0, turnX(nx, nz, cos, sin) * LIGHT.x + ny * LIGHT.y + turnZ(nx, nz, cos, sin) * LIGHT.z));
-		float normalX = (float) turnX(nx, nz, cos, sin);
-		float normalY = (float) ny;
-		float normalZ = (float) turnZ(nx, nz, cos, sin);
-
-		for (int pass = 0; pass < 2; pass++) {
-			for (int step = 0; step < 4; step++) {
-				int i = pass == 0 ? step : 3 - step;
-				float u;
-				float v;
-				if (Math.abs(ny) > 0.5) {
-					u = (float) (0.5 + xs[i] / UV_SPAN);
-					v = (float) (0.5 + zs[i] / UV_SPAN);
-				} else {
-					u = (float) (0.5 + (Math.abs(nx) > 0.5 ? zs[i] : xs[i]) / UV_SPAN);
-					v = (float) (ys[i] / UV_SPAN);
-				}
-				float lit = lambert * (float) (TIP_SHADE + (1 - TIP_SHADE) * Mth.clamp(ys[i] / TOTAL_HEIGHT, 0, 1));
-				consumer.addVertex(pose,
-								(float) turnX(xs[i], zs[i], cos, sin),
-								(float) ys[i],
-								(float) turnZ(xs[i], zs[i], cos, sin))
-						.setColor(0xFF000000 | shade(rgb, lit))
-						.setUv(u, v)
-						.setOverlay(OverlayTexture.NO_OVERLAY)
-						.setLight(FULL_BRIGHT)
-						.setNormal(pose, normalX, normalY, normalZ);
+	/** One face, unturned: its corners with their texture coordinates and how far down the point each sits. */
+	private static void face(List<Face> faces, double[] xs, double[] ys, double[] zs, double nx, double ny, double nz) {
+		Corner[] corners = new Corner[4];
+		for (int i = 0; i < 4; i++) {
+			float u;
+			float v;
+			if (Math.abs(ny) > 0.5) {
+				u = (float) (0.5 + xs[i] / UV_SPAN);
+				v = (float) (0.5 + zs[i] / UV_SPAN);
+			} else {
+				u = (float) (0.5 + (Math.abs(nx) > 0.5 ? zs[i] : xs[i]) / UV_SPAN);
+				v = (float) (ys[i] / UV_SPAN);
 			}
+			corners[i] = new Corner(xs[i], ys[i], zs[i], u, v,
+					(float) (TIP_SHADE + (1 - TIP_SHADE) * Mth.clamp(ys[i] / TOTAL_HEIGHT, 0, 1)));
 		}
+		faces.add(new Face(nx, ny, nz, corners));
 	}
 
 	private static double turnX(double x, double z, double cos, double sin) {
