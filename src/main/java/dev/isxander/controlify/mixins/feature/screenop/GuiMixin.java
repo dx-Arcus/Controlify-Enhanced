@@ -33,4 +33,17 @@ public class GuiMixin {
 	private boolean preventRemovingOldScreen(Screen oldScreen, @Local(argsOnly = true, name = "screen") Screen screen) {
 		return !(screen instanceof KeyboardOverlayScreen);
 	}
+
+	//? if >=26.3 {
+	/**
+	 * 26.3's setScreen also clears the outgoing screen's focus, just before the removed() call above;
+	 * 26.1 and 26.2 never did. Skipped for the same reason, and only then: the on-screen keyboard hands
+	 * what is typed to the widget it was opened for, and an EditBox refuses input while it is not
+	 * focused - so with the focus cleared, every key landed on nothing (tl106).
+	 */
+	@WrapWithCondition(method = "setScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;clearFocus()V"))
+	private boolean preventClearingOldScreenFocus(Screen oldScreen, @Local(argsOnly = true, name = "screen") Screen screen) {
+		return !(screen instanceof KeyboardOverlayScreen);
+	}
+	//?}
 }

@@ -6,8 +6,13 @@
  */
 package dev.isxander.controlify.gui.devfunctions;
 
+import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.config.settings.GlobalSettings;
+import dev.isxander.controlify.screenop.ComponentProcessorProvider;
+import dev.isxander.controlify.screenop.compat.vanilla.EditBoxComponentProcessor;
+import dev.isxander.controlify.screenop.keyboard.KeyboardOverlayScreen;
+import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionGroup;
@@ -22,6 +27,7 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -66,6 +72,16 @@ public final class DevFunctionsPanel {
 	private static final int FIELD_HEIGHT = 16;
 	private static final int FIELD_BOX_WIDTH = 46;
 	private static final int FIELD_LABEL_GAP = 4;
+
+	/** The on-screen keyboard a number box opens: digits only (assets/controlify/keyboard_layout/number_pad). */
+	private static final Identifier NUMBER_PAD_LAYOUT = CUtil.rl("number_pad");
+	/**
+	 * The pad's frame, as a share of the screen. The keyboard is twelve keys by four rows in 0.8 of
+	 * the width and 0.4 of the height (EditBoxComponentProcessor); the pad is three by four, so
+	 * this gives it keys the same size as the keyboard's.
+	 */
+	private static final float NUMBER_PAD_WIDTH = 0.2f;
+	private static final float NUMBER_PAD_HEIGHT = 0.4f;
 
 	private final int top;
 	private final Frame frame;
@@ -374,6 +390,9 @@ public final class DevFunctionsPanel {
 	 * reach the setting. Half-typed and out-of-range text simply does not commit, and the box is
 	 * put back to what actually got stored the moment it loses focus - so what is on screen is
 	 * always what is in effect, rather than a number that was quietly rejected.
+	 * <p>
+	 * With a controller it opens Controlify's on-screen keyboard as any box does, but as a number
+	 * pad (tl106): three keys wide, digits, backspace and enter, in a frame sized for it.
 	 */
 	private static final class NumberField extends EditBox {
 		private final DevFunctions.DevField field;
@@ -394,6 +413,25 @@ public final class DevFunctionsPanel {
 					// empty or half-typed: leave the stored value where it is
 				}
 			});
+			useNumberPad();
+		}
+
+		/**
+		 * Every EditBox gets its on-screen keyboard from the processor EditBoxMixin gives it; this
+		 * swaps that processor's layout for the pad and its frame for one the pad's size. The mixin
+		 * is not applied where the panel is built without the game, and then there is nothing to
+		 * swap.
+		 */
+		private void useNumberPad() {
+			if (!(((Object) this) instanceof ComponentProcessorProvider provider)
+					|| !(provider.componentProcessor() instanceof EditBoxComponentProcessor processor)) {
+				return;
+			}
+			Window window = Minecraft.getInstance().getWindow();
+			processor.setKeyboardLayout(Controlify.instance().keyboardLayoutManager().getLayout(NUMBER_PAD_LAYOUT));
+			processor.setPositioner(KeyboardOverlayScreen.aboveOrBelowWidgetPositioner(
+					(int) (window.getGuiScaledWidth() * NUMBER_PAD_WIDTH), (int) (window.getGuiScaledHeight() * NUMBER_PAD_HEIGHT),
+					1, this::getRectangle));
 		}
 
 		@Override

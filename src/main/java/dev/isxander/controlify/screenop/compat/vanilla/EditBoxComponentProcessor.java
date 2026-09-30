@@ -10,10 +10,10 @@ import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.screenop.ComponentProcessor;
 import dev.isxander.controlify.screenop.ScreenProcessor;
 import dev.isxander.controlify.screenop.keyboard.*;
+import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
 
 public class EditBoxComponentProcessor implements ComponentProcessor {
 
@@ -100,7 +100,9 @@ public class EditBoxComponentProcessor implements ComponentProcessor {
 
 		@Override
 		public boolean acceptKeyCode(int keycode, int scancode, int modifiers) {
-			this.editBox.keyPressed(new KeyEvent(keycode, scancode, modifiers));
+			// Built by MinecraftUtil rather than here: on 26.3 the box reads the SDL keycode, which the
+			// key alone does not carry (tl106).
+			this.editBox.keyPressed(MinecraftUtil.keyEvent(keycode, scancode, modifiers));
 			return true;
 		}
 
