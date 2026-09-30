@@ -50,8 +50,12 @@ public final class RainbowText implements Component {
 	private static final double SPREAD = 0.045;
 	/** One full turn of the spectrum, in milliseconds. */
 	private static final double FLOW_MS = 3500;
-	/** One pass of the highlight along the line. Deliberately not a multiple of the flow. */
-	private static final double SHINE_MS = 2200;
+	/**
+	 * How long the highlight spends on each character, so a pass takes as long as the line is: a
+	 * label and a paragraph get the same pace rather than the same time, which on a paragraph was
+	 * a blur (tl107). Ten characters a second - the pace "Open Color Wheels" always had.
+	 */
+	private static final double SHINE_MS_PER_CHAR = 99;
 	/** How wide the highlight is, in characters. */
 	private static final double SHINE_WIDTH = 2.6;
 	/** How far towards white the crest of the highlight goes. */
@@ -179,7 +183,8 @@ public final class RainbowText implements Component {
 
 		// The highlight starts off the near end and finishes off the far one, so it enters and
 		// leaves rather than appearing in the middle.
-		double travel = frac(now / SHINE_MS) * (length + SHINE_WIDTH * 2) - SHINE_WIDTH;
+		double span = length + SHINE_WIDTH * 2;
+		double travel = frac(now / (span * SHINE_MS_PER_CHAR)) * span - SHINE_WIDTH;
 		double distance = (index - travel) / SHINE_WIDTH;
 		double shine = Math.exp(-distance * distance * 4) * SHINE_STRENGTH;
 
