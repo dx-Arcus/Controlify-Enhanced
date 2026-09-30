@@ -45,6 +45,9 @@ public final class DevFunctionsPanel {
 	/**
 	 * The panel starts right below this option's description, which is the tallest one on the
 	 * screen (an image plus several lines of text), so no description is covered by the panel.
+	 * When there is no room for the whole panel between that and the toggle, the panel moves up
+	 * instead of losing rows, as far as the bottom of this option's image (tl105): the pane above
+	 * scrolls its text within what it is given, so nothing is covered - see {@link #create}.
 	 */
 	private static final String REFERENCE_OPTION_KEY = "controlify.gui.reach_around";
 	/** Height / width of the reference option's description image (reach-around-placement.webp is 320x180). */
@@ -119,10 +122,7 @@ public final class DevFunctionsPanel {
 		int descriptionTop = tabArea.top() + padding;
 
 		Font font = Minecraft.getInstance().font;
-		int top = descriptionTop + referenceDescriptionHeight(category, font, paddedWidth) + GAP;
-
 		int toggleY = searchFieldY - 2 - TOGGLE_SIZE;
-		int maxBottom = Math.max(toggleY - GAP, top);
 
 		// The frame is only as tall as its contents, so adding or removing a button resizes the
 		// panel instead of leaving a half-empty box stretched down to the toggle. Buttons pair up
@@ -134,6 +134,19 @@ public final class DevFunctionsPanel {
 				+ rows.size() * BUTTON_HEIGHT + Math.max(0, rows.size() - 1) * BUTTON_SPACING
 				+ (fields > 0 ? BUTTON_SPACING + fields * (FIELD_HEIGHT + BUTTON_SPACING) : 0)
 				+ INNER_PADDING;
+
+		// Under the reference option's description, unless the whole panel does not fit between
+		// that and the toggle: then as high as it needs to be, but never over that option's image
+		// (tl105). Donny's screen at GUI scale 4, with Block Reach Around on Everywhere and its
+		// warning making the description ten lines, had room for the buttons and not the two
+		// number boxes, and dropped them. The pane above scrolls its text within the space it is
+		// given - YACLScreenCategoryTabMixin keeps it above the panel - so nothing is covered;
+		// rows are still dropped, below, when even the image's edge leaves too little room.
+		int referenceTop = descriptionTop + referenceDescriptionHeight(category, font, paddedWidth) + GAP;
+		int fitTop = toggleY - GAP - contentHeight;
+		int imageBottom = descriptionTop + referenceHeadHeight(font, paddedWidth) + GAP;
+		int top = Math.max(Math.min(referenceTop, fitTop), imageBottom);
+		int maxBottom = Math.max(toggleY - GAP, top);
 		int bottom = Math.min(top + contentHeight, maxBottom);
 
 		return new DevFunctionsPanel(left, top, paddedWidth, bottom, toggleY, font, rows);
@@ -332,6 +345,11 @@ public final class DevFunctionsPanel {
 		return Controlify.instance().config().getSettings().globalSettings();
 	}
 
+	/** Height YACL uses to draw the reference option's name and image, above its text. */
+	private static int referenceHeadHeight(Font font, int width) {
+		return font.lineHeight + 5 + (int) (width * REFERENCE_IMAGE_ASPECT) + 5;
+	}
+
 	/** Height YACL uses to draw the reference option's description (name, image, wrapped text). */
 	private static int referenceDescriptionHeight(ConfigCategory category, Font font, int width) {
 		@Nullable Option<?> reference = null;
@@ -343,14 +361,12 @@ public final class DevFunctionsPanel {
 			}
 		}
 
-		int nameHeight = font.lineHeight + 5;
-		int imageHeight = (int) (width * REFERENCE_IMAGE_ASPECT) + 5;
+		int head = referenceHeadHeight(font, width);
 		if (reference == null) {
 			// Fall back to an image and four lines of text if the option ever goes away.
-			return nameHeight + imageHeight + font.lineHeight * 4;
+			return head + font.lineHeight * 4;
 		}
-		int textHeight = font.split(reference.description().text(), width).size() * font.lineHeight;
-		return nameHeight + imageHeight + textHeight;
+		return head + font.split(reference.description().text(), width).size() * font.lineHeight;
 	}
 
 	/**
