@@ -26,6 +26,7 @@ Controller aim assist with target lock, a few quality-of-life changes, and fixes
 
 - ["New server detected" toast](#new-server-detected-toast) — only shown when it applies.
 - [One controller counted twice](#one-controller-counted-twice) — a pad Windows reports twice is held once.
+- [On-screen keyboard on 26.3](#on-screen-keyboard-on-263) — what you type, and backspace, reach the text box again.
 
 **Testing**
 
@@ -130,7 +131,7 @@ While a target is locked, **Locked Strength**, **Locked Range** (up to 500 block
 > [!WARNING]
 > This tracks a mob for you rather than helping aim you're already making. That's an unfair advantage over players without Controlify, and many anti-cheats will likely flag it. Use it in singleplayer, or where everyone knows you have it and is fine with it.
 
-**Letting Go**, on the **Extras** tab — with **Drop Distant Targets** off, a lock only ends when the mob dies or you clear it. Turn it on and the lock drops once you've been further than **Drop Range** (or **Flying Drop Range**) from the mob for longer than **Time Before Dropping**. **Reset Depth** is how far back inside you have to come to reset the timer. The four sliders stay greyed out until Drop Distant Targets is on.
+**Letting Go**, on the **Extras** tab, is how a lock ends without holding Lock Target. **Hard Push Away** is what pushing the look stick hard away from the locked mob for a moment does — the same push that lets go of a mob Trajectory Aim is holding: **Off**, nothing, as before; **Drop the Lock** drops it outright, marker and compass with it; **Pause the Help** keeps the lock and the marker but takes the aim help off the mob so the camera is yours, until you ease the stick back. Off to start with. With **Drop Distant Targets** off, a lock otherwise only ends when the mob dies or you clear it. Turn it on and the lock drops once you've been further than **Drop Range** (or **Flying Drop Range**) from the mob for longer than **Time Before Dropping**. **Reset Depth** is how far back inside you have to come to reset the timer. The four sliders stay greyed out until Drop Distant Targets is on.
 
 #### Compass bar
 
@@ -201,13 +202,17 @@ The official mod shows this toast on Realms even though analog movement already 
 
 On Windows, one pad can be reported twice — through XInput and through GameInput — so it arrived as two controllers, with two toasts, swapping on every replug. This build keeps one. It's an upstream bug that also happens on the official 3.5.3, and launching with `-Dcontrolify.sdl.dedupe=0` turns the fix off.
 
+### On-screen keyboard on 26.3
+
+Minecraft 26.3 moved its input from GLFW to SDL, and two things in the official mod's on-screen keyboard didn't survive the move: the text box the keyboard was opened for lost its focus the moment the keyboard came up, so nothing typed reached it; and backspace, delete, the arrows, home and end did nothing, because the key presses were built without the keycode 26.3 reads. This build fixes both, in every text box — search boxes, direct connect, the chat box, signs — and puts the "Press A to open keyboard" hint where the box's own text sits, so it's no longer cut off in the creative inventory's search box.
+
 ---
 
 ## Testing
 
 ### Dev Functions panel
 
-A panel in Global Settings for triggering things on demand while testing: **New Server Toast**, **Check Aim Assist Target**, **Check Target Lock**, **Movement Type** and **Controller Connection**, plus **Marker Floor (blocks)** and **Color pointer speed** to type values into. The checkbox below it hides it.
+A panel in Global Settings for triggering things on demand while testing: **New Server Toast**, **Check Aim Assist Target**, **Check Target Lock**, **Movement Type** and **Controller Connection**, plus **Marker Floor (blocks)** and **Color pointer speed** to type values into — with a controller, they open a number pad rather than the whole keyboard. The checkbox below it hides it.
 
 <p align="center">
   <img alt="The Dev Functions panel" src="assets/fork/dev-functions-panel.png" width="620">
