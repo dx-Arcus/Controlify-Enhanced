@@ -74,8 +74,13 @@ public abstract class EditBoxMixin extends AbstractWidget implements ComponentPr
 				&& !(MinecraftUtil.getScreen() instanceof KeyboardOverlayScreen)
 				&& processor.getKeyboardBehaviour() instanceof ComponentKeyboardBehaviour.Handled
 			) {
-				int textX = this.getX() + (this.isBordered() ? 2 : 0) + 2;
-				int textY = this.getY() + (this.isBordered() ? 2 : 0) + 4;
+				// Where the box draws its own text (EditBox.updateTextPosition, the same in 26.1-26.3): a
+				// border indents it four and centres it in the height; without one it sits at the box's
+				// edge. This was four lower for every box, which on the creative inventory's borderless,
+				// nine-pixel search box put the half-size hint on the bottom edge with its descenders cut
+				// off (tl109). A bordered box comes out where it did.
+				int textX = this.getX() + (this.isBordered() ? 4 : 0);
+				int textY = this.isBordered() ? this.getY() + (this.getHeight() - 8) / 2 : this.getY();
 
 				if (renderedValue.isEmpty()
 					&& this.hint == null
