@@ -19,6 +19,7 @@ import dev.isxander.controlify.screenop.compat.vanilla.AbstractSignEditScreenPro
 import dev.isxander.controlify.screenop.keyboard.KeyboardLayouts;
 import dev.isxander.controlify.screenop.keyboard.KeyboardWidget;
 import dev.isxander.controlify.screenop.keyboard.MixinInputTarget;
+import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -26,7 +27,6 @@ import net.minecraft.client.gui.font.TextFieldHelper;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import org.jetbrains.annotations.Nullable;
@@ -130,7 +130,9 @@ public abstract class AbstractSignEditScreenMixin extends Screen implements Scre
 		}
 		if (this.signField == null) return false;
 
-		return this.signField.keyPressed(new KeyEvent(keycode, scancode, modifiers));
+		// Built by MinecraftUtil rather than here: on 26.3 the helper reads the SDL keycode, which the
+		// key alone does not carry (tl108).
+		return this.signField.keyPressed(MinecraftUtil.keyEvent(keycode, scancode, modifiers));
 	}
 
 	@Override

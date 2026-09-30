@@ -14,13 +14,13 @@ import dev.isxander.controlify.api.ControlifyApi;
 import dev.isxander.controlify.screenop.ScreenProcessorProvider;
 import dev.isxander.controlify.screenop.compat.vanilla.ChatScreenProcessor;
 import dev.isxander.controlify.screenop.keyboard.*;
+import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -139,7 +139,9 @@ public abstract class ChatScreenMixin extends Screen implements ScreenProcessorP
 				InputConstants.KEY_ESCAPE
 		).contains(keycode);
 
-		Predicate<GuiEventListener> keyPress = listener -> listener.keyPressed(new KeyEvent(keycode, scancode, modifiers));
+		// Built by MinecraftUtil rather than here: on 26.3 the box reads the SDL keycode, which the key
+		// alone does not carry (tl108).
+		Predicate<GuiEventListener> keyPress = listener -> listener.keyPressed(MinecraftUtil.keyEvent(keycode, scancode, modifiers));
 
 		if (bypassInput) {
 			return keyPress.test((ChatScreen) (Object) this);
