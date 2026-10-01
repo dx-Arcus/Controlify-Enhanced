@@ -948,5 +948,9 @@
   "controlify.gui.dev_functions.touch_show_fingers": "Show Fingers",
   "controlify.gui.dev_functions.touch_show_fingers.tooltip": "Draws every finger the game can see, in the world and over any screen: a dot where it landed, a ring where it is, and at the top left how many are down and how many finger events have arrived. For checking that touch input reaches the mod. Press again to hide it.",
   "controlify.toast.touch.mouse_as_finger": "Mouse as Finger",
-  "controlify.toast.touch.show_fingers": "Show Fingers"
+  "controlify.toast.touch.show_fingers": "Show Fingers",
+  "controlify.gui.dev_functions.touch_controls": "Touch Controls",
+  "controlify.gui.dev_functions.touch_controls.tooltip": "Turns the touch pad on: a stick appears under your left thumb anywhere on the left side of the screen, and swiping on the right turns the camera. Push the stick past its rim to sprint. While it is on, a tap in a menu still clicks. Press again to turn it off. With Mouse as Finger on as well, the mouse stands in for the thumb, and the cursor is left free so that it can.",
+  "controlify.toast.touch.controls": "Touch Controls",
+  "controlify.toast.touch.controls.refused": "Could not attach the pad - see the log"
 }

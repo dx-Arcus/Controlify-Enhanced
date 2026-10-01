@@ -27,6 +27,7 @@ import dev.isxander.controlify.gui.screen.RadialItems.RadialPage;
 import dev.isxander.controlify.gui.screen.RadialMenuScreen;
 import dev.isxander.controlify.mixins.feature.steamdeck.ScreenshotAccessor;
 import dev.isxander.controlify.server.ServerPolicies;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.ControllerUtils;
 import dev.isxander.controlify.utils.DebugOverlayHelper;
 import dev.isxander.controlify.utils.HoldRepeatHelper;
@@ -553,7 +554,8 @@ public class InGameInputHandler {
 	}
 
 	private boolean canProcessLookInput() {
-		boolean mouseNotGrabbed = !minecraft.mouseHandler.isMouseGrabbed() && !controlify.config().getSettings().globalSettings().outOfFocusInput;
+		// Under touch controls the cursor may be free on purpose (TouchPad.cursorFree); the look goes on regardless (tl111).
+		boolean mouseNotGrabbed = !minecraft.mouseHandler.isMouseGrabbed() && !controlify.config().getSettings().globalSettings().outOfFocusInput && !TouchPad.active();
 		boolean outOfFocus = !minecraft.isWindowActive() && !controlify.config().getSettings().globalSettings().outOfFocusInput;
 		boolean screenVisible = MinecraftUtil.getScreen() != null;
 		boolean playerExists = minecraft.player != null;

@@ -13,6 +13,7 @@ import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.InputMode;
 import dev.isxander.controlify.api.ControlifyApi;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.MouseMinecraftCallNotifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
@@ -106,6 +107,14 @@ public class MouseHandlerMixin implements MouseMinecraftCallNotifier {
 	@Inject(method = "releaseMouse", at = @At(value = "RETURN"))
 	private void resetCalledFromMinecraftSetScreen(CallbackInfo ci) {
 		controlify$calledFromMinecraftSetScreen = false;
+	}
+
+	/** While the mouse stands in for a finger under touch controls, the cursor stays free: the game's grabs are refused (tl111, TouchPad). */
+	@Inject(method = "grabMouse", at = @At("HEAD"), cancellable = true)
+	private void keepCursorFreeForTouch(CallbackInfo ci) {
+		if (TouchPad.cursorFree()) {
+			ci.cancel();
+		}
 	}
 
 	@ModifyExpressionValue(method = "grabMouse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;isWindowActive()Z"))

@@ -16,6 +16,7 @@ import dev.isxander.controlify.config.settings.TargetLockSettings;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
 import dev.isxander.controlify.touch.TouchDebugOverlay;
 import dev.isxander.controlify.touch.TouchInput;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
@@ -108,6 +109,7 @@ public final class DevFunctions {
 		button("controlify.gui.dev_functions.controller_connection", ALWAYS, DevFunctions::showConnectionToast);
 		button("controlify.gui.dev_functions.forget_connections", ALWAYS, DevFunctions::forgetConnections);
 		if (TouchInput.SUPPORTED) {
+			button("controlify.gui.dev_functions.touch_controls", ALWAYS, DevFunctions::toggleTouchControls);
 			button("controlify.gui.dev_functions.touch_mouse_as_finger", ALWAYS, DevFunctions::toggleMouseAsFinger);
 			button("controlify.gui.dev_functions.touch_show_fingers", ALWAYS, DevFunctions::toggleShowFingers);
 		}
@@ -424,6 +426,14 @@ public final class DevFunctions {
 	/** Splits a stored set of paths back out, through {@link #learnable}, so an empty setting is an empty set. */
 	private static Set<String> paths(String stored) {
 		return learnable(List.of(stored.split(DevConfig.PATH_SEPARATOR)));
+	}
+
+	/** Flips touch controls - the pad and the look under the fingers (tl111, {@link TouchPad}) - and says which way it went. */
+	private static void toggleTouchControls() {
+		boolean on = !TouchPad.active();
+		TouchPad.setActive(on);
+		MinecraftUtil.sendToast(Component.translatable("controlify.toast.touch.controls"),
+				Component.translatable(TouchPad.active() == on ? (on ? "options.on" : "options.off") : "controlify.toast.touch.controls.refused"), false);
 	}
 
 	/** Flips whether the mouse stands in for a finger (tl110, {@link TouchInput#setMouseAsFinger}) and says which way it went. */

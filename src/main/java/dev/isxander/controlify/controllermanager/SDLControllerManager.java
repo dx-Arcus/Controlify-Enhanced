@@ -29,6 +29,7 @@ import dev.isxander.sdl.*;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -452,6 +453,12 @@ public class SDLControllerManager extends AbstractControllerManager {
 	 * lists them. Unlike {@link #connections()} this opens nothing, so it is cheap enough to ask
 	 * every tick - the dev panel does, to know when its Learn buttons have something to record.
 	 */
+	/** The SDL the controllers come from - what the touch pad attaches its virtual gamepad to (tl111). Null before init. */
+	public static @Nullable Sdl sdl() {
+		SDLControllerManager manager = instance;
+		return manager == null ? null : manager.sdl;
+	}
+
 	public static List<String> attachedPaths() {
 		SDLControllerManager manager = instance;
 		return manager == null ? List.of() : manager.listPaths();

@@ -58,6 +58,7 @@ import dev.isxander.controlify.server.packets.*;
 import dev.isxander.controlify.sound.ControlifyClientSounds;
 import dev.isxander.controlify.touch.TouchDebugOverlay;
 import dev.isxander.controlify.touch.TouchInput;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.*;
 import dev.isxander.controlify.virtualmouse.VirtualMouseHandler;
 import dev.isxander.controlify.wireless.LowBatteryNotifier;
@@ -209,6 +210,7 @@ public class Controlify implements ControlifyApi {
 		/*PlatformClientUtil.addHudLayer(CUtil.rl("target_lock_marker"), TargetLockRenderer::render);
 		*///?}
 		PlatformClientUtil.addHudLayer(CUtil.rl("target_lock_compass"), CompassBarRenderer::render);
+		PlatformClientUtil.addHudLayer(CUtil.rl("touch_pad"), TouchPad::render);
 		PlatformClientUtil.addHudLayer(CUtil.rl("touch_debug"), TouchDebugOverlay::renderHud);
 
 		PlatformMainUtil.applyToControlifyEntrypoint(entrypoint -> {
@@ -642,6 +644,9 @@ public class Controlify implements ControlifyApi {
 
 	@Override
 	public boolean setInputMode(@NotNull InputMode newInputMode) {
+		// Touch controls hold the mode at MIXED: the fingers are the pad, and on a screen the mouse, and
+		// neither is allowed to flip it (tl111).
+		if (TouchPad.active()) newInputMode = InputMode.MIXED;
 		if (this.currentInputMode == newInputMode) return false;
 		if (newInputMode.isController() && this.getCurrentController().isEmpty()) {
 			DebugLog.log("Attempted to switch to controller input mode with no current controller set.");
