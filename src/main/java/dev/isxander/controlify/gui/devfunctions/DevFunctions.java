@@ -14,6 +14,8 @@ import dev.isxander.controlify.config.dto.TargetLockConfig;
 import dev.isxander.controlify.config.settings.GlobalSettings;
 import dev.isxander.controlify.config.settings.TargetLockSettings;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
+import dev.isxander.controlify.touch.TouchDebugOverlay;
+import dev.isxander.controlify.touch.TouchInput;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
@@ -105,6 +107,10 @@ public final class DevFunctions {
 		learnButton("controlify.gui.dev_functions.learn_wireless", false);
 		button("controlify.gui.dev_functions.controller_connection", ALWAYS, DevFunctions::showConnectionToast);
 		button("controlify.gui.dev_functions.forget_connections", ALWAYS, DevFunctions::forgetConnections);
+		if (TouchInput.SUPPORTED) {
+			button("controlify.gui.dev_functions.touch_mouse_as_finger", ALWAYS, DevFunctions::toggleMouseAsFinger);
+			button("controlify.gui.dev_functions.touch_show_fingers", ALWAYS, DevFunctions::toggleShowFingers);
+		}
 
 		field("controlify.gui.dev_functions.marker_floor", TargetLockConfig.MIN_MARKER_FLOOR, TargetLockConfig.MAX_MARKER_FLOOR,
 				() -> targetLock().markerFloorBlocks, value -> targetLock().markerFloorBlocks = value);
@@ -418,6 +424,22 @@ public final class DevFunctions {
 	/** Splits a stored set of paths back out, through {@link #learnable}, so an empty setting is an empty set. */
 	private static Set<String> paths(String stored) {
 		return learnable(List.of(stored.split(DevConfig.PATH_SEPARATOR)));
+	}
+
+	/** Flips whether the mouse stands in for a finger (tl110, {@link TouchInput#setMouseAsFinger}) and says which way it went. */
+	private static void toggleMouseAsFinger() {
+		boolean on = !TouchInput.mouseAsFinger();
+		TouchInput.setMouseAsFinger(on);
+		MinecraftUtil.sendToast(Component.translatable("controlify.toast.touch.mouse_as_finger"),
+				Component.translatable(on ? "options.on" : "options.off"), false);
+	}
+
+	/** Flips the overlay that draws every finger the game can see (tl110, {@link TouchDebugOverlay}). */
+	private static void toggleShowFingers() {
+		boolean on = !TouchDebugOverlay.shown();
+		TouchDebugOverlay.setShown(on);
+		MinecraftUtil.sendToast(Component.translatable("controlify.toast.touch.show_fingers"),
+				Component.translatable(on ? "options.on" : "options.off"), false);
 	}
 
 	/** Shows whether analog or keyboard-like movement is active right now. */

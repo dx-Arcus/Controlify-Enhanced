@@ -56,6 +56,8 @@ import dev.isxander.controlify.ingame.InGameInputHandler;
 import dev.isxander.controlify.mixins.feature.virtualmouse.MouseHandlerAccessor;
 import dev.isxander.controlify.server.packets.*;
 import dev.isxander.controlify.sound.ControlifyClientSounds;
+import dev.isxander.controlify.touch.TouchDebugOverlay;
+import dev.isxander.controlify.touch.TouchInput;
 import dev.isxander.controlify.utils.*;
 import dev.isxander.controlify.virtualmouse.VirtualMouseHandler;
 import dev.isxander.controlify.wireless.LowBatteryNotifier;
@@ -207,6 +209,7 @@ public class Controlify implements ControlifyApi {
 		/*PlatformClientUtil.addHudLayer(CUtil.rl("target_lock_marker"), TargetLockRenderer::render);
 		*///?}
 		PlatformClientUtil.addHudLayer(CUtil.rl("target_lock_compass"), CompassBarRenderer::render);
+		PlatformClientUtil.addHudLayer(CUtil.rl("touch_debug"), TouchDebugOverlay::renderHud);
 
 		PlatformMainUtil.applyToControlifyEntrypoint(entrypoint -> {
 			try {
@@ -262,6 +265,8 @@ public class Controlify implements ControlifyApi {
 					virtualMouseHandler().renderVirtualMouse(graphics);
 					ScreenProcessorProvider.provide(screen).render(controller, graphics, tickDelta);
 				}));
+		PlatformClientUtil.registerPostScreenRender((screen, graphics, mouseX, mouseY, tickDelta) ->
+				TouchDebugOverlay.renderScreen(graphics));
 
 		try {
 			Sdl sdl = SDLNativesLoader.load();
@@ -270,6 +275,9 @@ public class Controlify implements ControlifyApi {
 			CUtil.LOGGER.error("Failed to initialize controller manager", throwable);
 			return;
 		}
+
+		// Fingers come from the game's own SDL, not the one just loaded for controllers (tl110).
+		TouchInput.install();
 
 		PlatformClientUtil.registerClientTickStarted(this::tick);
 

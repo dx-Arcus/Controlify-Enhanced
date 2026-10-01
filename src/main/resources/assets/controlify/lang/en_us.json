@@ -942,5 +942,11 @@
   "controlify.gui.dev_functions.forget_connections": "Clear Learned",
   "controlify.gui.dev_functions.forget_connections.tooltip": "Throws away every path the Learn buttons recorded, for both wired and wireless, so the whole thing can be taught again from nothing. This is the way back from pressing a Learn button in the wrong state, since learning only ever adds. Controller Connection goes back to saying it has not been taught yet.",
   "controlify.toast.connection.forgotten.title": "Learned Connections Cleared",
-  "controlify.toast.connection.forgotten.description": "Forgot %s recorded path(s). Use the Learn buttons again to teach it."
+  "controlify.toast.connection.forgotten.description": "Forgot %s recorded path(s). Use the Learn buttons again to teach it.",
+  "controlify.gui.dev_functions.touch_mouse_as_finger": "Mouse as Finger",
+  "controlify.gui.dev_functions.touch_mouse_as_finger.tooltip": "Makes the mouse stand in for one finger: the left button held is a finger down, moving it while held is the finger moving, letting go lifts it. The mouse goes on working as a mouse too. For trying touch controls without a touchscreen; press again to turn it off. It only moves while the cursor is free - on a screen, not in the world, where the game holds the cursor still.",
+  "controlify.gui.dev_functions.touch_show_fingers": "Show Fingers",
+  "controlify.gui.dev_functions.touch_show_fingers.tooltip": "Draws every finger the game can see, in the world and over any screen: a dot where it landed, a ring where it is, and at the top left how many are down and how many finger events have arrived. For checking that touch input reaches the mod. Press again to hide it.",
+  "controlify.toast.touch.mouse_as_finger": "Mouse as Finger",
+  "controlify.toast.touch.show_fingers": "Show Fingers"
 }
