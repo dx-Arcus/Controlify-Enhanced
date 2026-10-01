@@ -18,6 +18,7 @@ import dev.isxander.controlify.gui.guide.GuideRenderer;
 import dev.isxander.controlify.mixins.feature.guide.screen.AbstractContainerScreenAccessor;
 import dev.isxander.controlify.mixins.feature.screenop.ScreenAccessor;
 import dev.isxander.controlify.screenop.ScreenProcessor;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.virtualmouse.VirtualMouseBehaviour;
 import dev.isxander.controlify.virtualmouse.VirtualMouseHandler;
 import net.minecraft.client.gui.components.Renderable;
@@ -137,6 +138,8 @@ public class AbstractContainerScreenProcessor<T extends AbstractContainerScreen<
 			.ifPresent(c -> this.guideRenderable.setGuiScale(c.settings().generic.guide.screenGuiScale));
 
 		render &= ControlifyApi.get().getCurrentController().map(c -> c.settings().generic.guide.showScreenGuides).orElse(false);
+		// Not under touch controls: a finger presses no pad button on a screen (tl116).
+		render &= !TouchPad.active();
 
 		List<Renderable> renderables = ((ScreenAccessor) screen).controlify$getRenderables();
 

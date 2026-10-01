@@ -14,6 +14,7 @@ import dev.isxander.controlify.screenop.keyboard.ComponentKeyboardBehaviour;
 import dev.isxander.controlify.screenop.keyboard.CommonKeyboardHints;
 import dev.isxander.controlify.screenop.keyboard.KeyboardWidget;
 import dev.isxander.controlify.screenop.ScreenProcessor;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.HoldRepeatHelper;
 import dev.isxander.controlify.utils.LazyComponentDims;
 import dev.isxander.controlify.virtualmouse.VirtualMouseHandler;
@@ -96,7 +97,8 @@ public class ChatScreenProcessor extends ScreenProcessor<ChatScreen> {
 	protected void render(ControllerEntity controller, GuiGraphicsExtractor graphics, float tickDelta, Optional<VirtualMouseHandler> vmouse) {
 		var settings = controller.settings().generic;
 
-		if (this.keyboardSupplier.get() != null && settings.guide.showScreenGuides) {
+		// Not under touch controls: a finger presses no pad button on a screen, and taps the keys (tl116).
+		if (this.keyboardSupplier.get() != null && settings.guide.showScreenGuides && !TouchPad.active()) {
 			if (settings.keyboard.hintCursor) {
 				LazyComponentDims hint = CommonKeyboardHints.TEXT_CURSOR;
 

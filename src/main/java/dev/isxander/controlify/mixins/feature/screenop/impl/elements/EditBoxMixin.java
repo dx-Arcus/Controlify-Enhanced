@@ -18,6 +18,7 @@ import dev.isxander.controlify.screenop.compat.vanilla.EditBoxComponentProcessor
 import dev.isxander.controlify.screenop.keyboard.CommonKeyboardHints;
 import dev.isxander.controlify.screenop.keyboard.ComponentKeyboardBehaviour;
 import dev.isxander.controlify.screenop.keyboard.KeyboardOverlayScreen;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -71,6 +72,8 @@ public abstract class EditBoxMixin extends AbstractWidget implements ComponentPr
 				&& controller.settings().generic.keyboard.showOnScreenKeyboard
 				&& controller.settings().generic.guide.showScreenGuides
 				&& ControlifyApi.get().currentInputMode().isController()
+				// Not under touch controls: a finger presses no pad button on a screen (tl116).
+				&& !TouchPad.active()
 				&& !(MinecraftUtil.getScreen() instanceof KeyboardOverlayScreen)
 				&& processor.getKeyboardBehaviour() instanceof ComponentKeyboardBehaviour.Handled
 			) {

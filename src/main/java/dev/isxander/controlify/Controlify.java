@@ -267,6 +267,9 @@ public class Controlify implements ControlifyApi {
 					virtualMouseHandler().renderVirtualMouse(graphics);
 					ScreenProcessorProvider.provide(screen).render(controller, graphics, tickDelta);
 				}));
+		// Under touch controls, the close button over any screen Esc would close (tl116); the fingers drawn after it.
+		PlatformClientUtil.registerPostScreenRender((screen, graphics, mouseX, mouseY, tickDelta) ->
+				TouchPad.renderScreen(screen, graphics));
 		PlatformClientUtil.registerPostScreenRender((screen, graphics, mouseX, mouseY, tickDelta) ->
 				TouchDebugOverlay.renderScreen(graphics));
 

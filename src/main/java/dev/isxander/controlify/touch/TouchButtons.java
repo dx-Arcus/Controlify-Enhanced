@@ -47,6 +47,9 @@ import java.util.Set;
  * <p>The look is the mod's own and must stay so - nothing is traced from Mojang's art: a see-through dark
  * square with its corners cut and a grey outline, a light grey picture on it casting a shadow; held, the
  * square light grey and the picture dark. While the player flies, jump and sneak show up and down.
+ *
+ * <p>On a screen none of these is drawn or pressed. A close button is drawn instead, in the top-right corner
+ * of any screen that Esc would close, and a tap on it closes the screen as Esc does ({@link #CLOSE}, tl116).
  */
 public final class TouchButtons {
 	/** A tapped button stays pressed at least this long, so the controller's tick - twenty a second - sees it. */
@@ -75,7 +78,8 @@ public final class TouchButtons {
 	 * The pictures, the mod's own: on the {@link #GRID}-unit grid, where the top-left of each sits, then its
 	 * rows. Jump and sneak a caret up and down, flying up and down a double one; sprint an arrow with speed
 	 * lines; attack an upright sword with a point; use an open hand; chat a bubble with lines of text; pause
-	 * two bars. Each casts a shadow a unit down and right, worked out from its rows ({@link #rects}).
+	 * two bars; close sneak's caret over jump's, tip to tip. Each casts a shadow a unit down and right, worked
+	 * out from its rows ({@link #rects}).
 	 */
 	enum Icon {
 		JUMP(4, 7,
@@ -170,7 +174,20 @@ public final class TouchButtons {
 				"###..###",
 				"###..###",
 				"###..###",
-				"###..###");
+				"###..###"),
+		CLOSE(4, 4,
+				"###......###",
+				".###....###.",
+				"..###..###..",
+				"...######...",
+				"....####....",
+				".....##.....",
+				".....##.....",
+				"....####....",
+				"...######...",
+				"..###..###..",
+				".###....###.",
+				"###......###");
 
 		final int left;
 		final int top;
@@ -205,6 +222,13 @@ public final class TouchButtons {
 			new Button("use", Icon.USE, 1f, -15f, 1f, -15f, 0.12f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, true),
 			new Button("chat", Icon.CHAT, 0.5f, 0f, 0f, 11.26f, 0.058f, SdlGamepad.SDL_GAMEPAD_BUTTON_DPAD_UP, -1, false),
 			new Button("pause", Icon.PAUSE, 0.5f, 21.26f, 0f, 11.26f, 0.058f, SdlGamepad.SDL_GAMEPAD_BUTTON_START, -1, false));
+
+	/**
+	 * The close button, on a screen only: in the top-right corner, the size of chat and pause and as far below
+	 * the top, as far in from the right edge. It presses nothing on the pad; a tap on it closes the screen as Esc
+	 * does ({@link TouchPad#closeTapped}).
+	 */
+	static final Button CLOSE = new Button("close", Icon.CLOSE, 1f, -11.26f, 0f, 11.26f, 0.058f, -1, -1, false);
 
 	/** The inventory slot after the hotbar: an index past the buttons, pressing Y - inventory on the default binds. */
 	static final int INVENTORY = BUTTONS.size();
@@ -490,6 +514,27 @@ public final class TouchButtons {
 				graphics.fill(x + 5 + dot * 5, y + 10, x + 7 + dot * 5, y + 12, PICTURE | 0xFF000000);
 			}
 		}
+	}
+
+	/**
+	 * Draws the close button over a screen, into the window's own pixels as the buttons are drawn in the world
+	 * (the GUI is {@code scale} pixels a unit, so the pose is scaled down by it). It is never drawn held: a tap
+	 * closes the screen at once.
+	 */
+	static void renderClose(GuiGraphicsExtractor graphics, int width, int height, int scale) {
+		Matrix3x2fStack pose = graphics.pose().pushMatrix();
+		pose.scale(1f / scale, 1f / scale);
+		Box box = box(CLOSE, width, height);
+		int u = box.unit();
+		for (int[] r : REST_RECTS.get(CLOSE.icon())) {
+			graphics.fill(box.x() + r[0] * u, box.y() + r[1] * u, box.x() + r[2] * u, box.y() + r[3] * u, r[4]);
+		}
+		pose.popMatrix();
+	}
+
+	/** Whether a point on a screen, in GUI pixels, is on the close button in a window of this many pixels at this GUI scale. */
+	static boolean closeContains(int width, int height, int scale, double guiX, double guiY) {
+		return box(CLOSE, width, height).contains((float) (guiX * scale), (float) (guiY * scale));
 	}
 
 	/** The picture a button shows: jump and sneak show flying up and down while the player flies. */

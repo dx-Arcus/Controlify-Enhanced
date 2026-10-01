@@ -6,10 +6,12 @@
  */
 package dev.isxander.controlify.touch;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
+import dev.isxander.controlify.screenop.ScreenProcessor;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import dev.isxander.sdl.Sdl;
@@ -25,6 +27,7 @@ import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.HumanoidArm;
 import org.jetbrains.annotations.Nullable;
@@ -60,8 +63,10 @@ import java.util.Set;
  * controller's look - go ahead with or without it. The grab itself is left alone: a touchscreen's
  * fingers arrive grabbed or not. Only while the mouse stands in for a finger ({@link
  * TouchInput#mouseAsFinger}) is the cursor set free, because SDL makes finger motion out of the mouse
- * only while the cursor is free; the game's grabs are refused for as long as that lasts. Switched by
- * the Dev Functions panel's Touch Controls for now; nothing is saved.
+ * only while the cursor is free; the game's grabs are refused for as long as that lasts. On a screen the
+ * pad lets go, the screens' controller glyphs are not drawn, and a close button stands in for Esc
+ * ({@link #renderScreen}, {@link #closeTapped}, tl116). Switched by the Dev Functions panel's Touch
+ * Controls for now; nothing is saved.
  */
 public final class TouchPad {
 	/** How far from the left edge, as a fraction of the window's width, a finger landing becomes the stick. */
@@ -497,6 +502,37 @@ public final class TouchPad {
 			return;
 		}
 		draw(graphics, view(Minecraft.getInstance()));
+	}
+
+	/**
+	 * After any screen draws: the close button in its top-right corner, while touch controls are on and the
+	 * screen is one that Esc would close (tl116). A screen that will not close - the title screen, the death
+	 * screen - shows none.
+	 */
+	public static void renderScreen(Screen screen, GuiGraphicsExtractor graphics) {
+		if (!active || !screen.shouldCloseOnEsc()) {
+			return;
+		}
+		Window window = Minecraft.getInstance().getWindow();
+		TouchButtons.renderClose(graphics, window.getWidth(), window.getHeight(), window.getGuiScale());
+	}
+
+	/**
+	 * A click on a screen, before the screen has it: a left click - a finger's tap, which SDL makes a click on a
+	 * screen - on the close button closes the screen as Esc does, with the sound a controller's back makes, and
+	 * the screen never sees it. True if it did (tl116).
+	 */
+	public static boolean closeTapped(Screen screen, double guiX, double guiY, int button) {
+		if (!active || button != InputConstants.MOUSE_BUTTON_LEFT || !screen.shouldCloseOnEsc()) {
+			return false;
+		}
+		Window window = Minecraft.getInstance().getWindow();
+		if (!TouchButtons.closeContains(window.getWidth(), window.getHeight(), window.getGuiScale(), guiX, guiY)) {
+			return false;
+		}
+		ScreenProcessor.playClackSound();
+		screen.onClose();
+		return true;
 	}
 
 	/** {@link #render}, against a given window - for tests. */

@@ -10,6 +10,7 @@ import com.google.common.collect.ImmutableList;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.bindings.ControlifyBindings;
 import dev.isxander.controlify.controller.ControllerEntity;
+import dev.isxander.controlify.touch.TouchPad;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -34,7 +35,8 @@ public class TabNavigationBarMixin {
 	/*@Inject(method = "extractRenderState", at = @At("RETURN"))
 	*///?}
 	private void renderControllerButtonOverlay(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-		if (Controlify.instance().currentInputMode().isController()) {
+		// Not under touch controls: a finger presses no pad button on a screen (tl116).
+		if (Controlify.instance().currentInputMode().isController() && !TouchPad.active()) {
 			Controlify.instance().getCurrentController().ifPresent(c -> {
 				if (c.settings().generic.guide.showScreenGuides) {
 					this.renderControllerButtonOverlay(graphics, c);

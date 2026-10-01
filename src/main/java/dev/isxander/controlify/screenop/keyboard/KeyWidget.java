@@ -15,6 +15,7 @@ import dev.isxander.controlify.font.BindingFontHelper;
 import dev.isxander.controlify.screenop.ComponentProcessor;
 import dev.isxander.controlify.screenop.ScreenControllerEventListener;
 import dev.isxander.controlify.screenop.ScreenProcessor;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.HoldRepeatHelper;
 import net.minecraft.client.Minecraft;
@@ -343,6 +344,8 @@ public class KeyWidget extends AbstractWidget implements ComponentProcessor, Scr
 		KeyboardLayout.KeyFunction keyFunction = key.getFunction(shift);
 
 		return key.shortcutBinding()
+				// Not under touch controls: a finger presses no pad button on a screen, and taps the key (tl116).
+				.filter(b -> !TouchPad.active())
 				.map(b -> BindingFontHelper.binding(b.bindId()))
 				.<Component>map(glyph -> Component.empty()
 						.append(glyph)

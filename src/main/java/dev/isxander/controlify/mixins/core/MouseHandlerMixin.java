@@ -18,6 +18,8 @@ import dev.isxander.controlify.utils.MinecraftUtil;
 import dev.isxander.controlify.utils.MouseMinecraftCallNotifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -128,6 +130,24 @@ public class MouseHandlerMixin implements MouseMinecraftCallNotifier {
 		if (TouchPad.cursorFree() && MinecraftUtil.getScreen() == null) {
 			ci.cancel();
 		}
+	}
+
+	/**
+	 * Under touch controls a tap on the close button drawn over a screen closes the screen, as Esc does, and the
+	 * screen never sees the click (tl116, TouchPad.closeTapped). Any other click goes to the screen as ever.
+	 */
+	@WrapOperation(
+			method = "onButton",
+			at = @At(
+					value = "INVOKE",
+					target = "Lnet/minecraft/client/gui/screens/Screen;mouseClicked(Lnet/minecraft/client/input/MouseButtonEvent;Z)Z"
+			)
+	)
+	private boolean closeScreenForTouch(Screen screen, MouseButtonEvent event, boolean doubleClick, Operation<Boolean> original) {
+		if (TouchPad.closeTapped(screen, event.x(), event.y(), event.button())) {
+			return true;
+		}
+		return original.call(screen, event, doubleClick);
 	}
 
 	@ModifyExpressionValue(method = "grabMouse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;isWindowActive()Z"))

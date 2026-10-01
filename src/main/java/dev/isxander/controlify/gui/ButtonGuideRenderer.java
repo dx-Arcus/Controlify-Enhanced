@@ -10,6 +10,7 @@ import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.bind.InputBinding;
 import dev.isxander.controlify.api.buttonguide.ButtonGuidePredicate;
 import dev.isxander.controlify.api.bind.InputBindingSupplier;
+import dev.isxander.controlify.touch.TouchPad;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -46,6 +47,8 @@ public interface ButtonGuideRenderer<T> {
 			Optional<InputBinding> binding = getBind();
 			return binding.isPresent()
 					&& Controlify.instance().currentInputMode().isController()
+					// Not under touch controls: a finger presses no pad button on a screen (tl116).
+					&& !TouchPad.active()
 					&& Controlify.instance().getCurrentController().map(c -> c.settings().generic.guide.showScreenGuides).orElse(false)
 					&& !binding.get().isUnbound()
 					&& renderPredicate().shouldDisplay(renderable);
