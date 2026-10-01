@@ -38,15 +38,15 @@ import java.util.Set;
  * finger is looking. A tapped button stays pressed for {@link #MIN_PRESS_NANOS} at least: the pad is read
  * twenty times a second, and a quicker tap could fall between two reads.
  *
- * <p>Positions are Bedrock's, measured off its screen. A button is a grid of {@link #GRID} units a side,
- * its size a fraction of the window's height rounded to a whole number of the window's pixels a unit,
- * drawn straight into the window's pixels so the edges stay sharp at any GUI scale. Its centre is a
- * fraction of the window across and down plus an offset in its own units, so the gaps between buttons
- * grow and shrink with the rounded size and neighbours never close up, at any window size.
+ * <p>The arrangement is Bedrock's, measured off its screen, tucked into the corners. A button is a grid of
+ * {@link #GRID} units a side, its size a fraction of the window's height rounded to a whole number of the
+ * window's pixels a unit, drawn straight into the window's pixels so the edges stay sharp at any GUI scale.
+ * Its centre is a fraction of the window across and down plus an offset in its own units, so the gaps
+ * between buttons grow and shrink with the rounded size and neighbours never close up, at any window size.
  *
  * <p>The look is the mod's own and must stay so - nothing is traced from Mojang's art: a see-through dark
- * square with its corners cut and a white outline, a white picture on it, the colours swapped while it
- * is held. While the player flies, jump and sneak show up and down.
+ * square with its corners cut and a grey outline, a light grey picture on it casting a shadow; held, the
+ * square light grey and the picture dark. While the player flies, jump and sneak show up and down.
  */
 public final class TouchButtons {
 	/** A tapped button stays pressed at least this long, so the controller's tick - twenty a second - sees it. */
@@ -58,13 +58,15 @@ public final class TouchButtons {
 	/** What each unit of a button's frame is, row by row: O the outline, F the fill, a space nothing. */
 	static final String[] FRAME = frame();
 
-	/** The colours: the outline, the fill and the picture, at rest and held. */
-	private static final int OUTLINE = 0xC0FFFFFF;
-	private static final int FILL = 0x60000000;
-	private static final int PICTURE = 0xF0FFFFFF;
-	private static final int OUTLINE_HELD = 0xFFFFFFFF;
-	private static final int FILL_HELD = 0xA0FFFFFF;
-	private static final int PICTURE_HELD = 0xE0303030;
+	/** The colours, greys all (Donny, 05:29): the outline, the fill, the picture and its shadow, at rest and held. */
+	private static final int OUTLINE = 0xC0A4A4A4;
+	private static final int FILL = 0x70000000;
+	private static final int PICTURE = 0xF0C4C4C4;
+	private static final int SHADOW = 0xE0101010;
+	private static final int OUTLINE_HELD = 0xFFD8D8D8;
+	private static final int FILL_HELD = 0xA0B4B4B4;
+	private static final int PICTURE_HELD = 0xF0303030;
+	private static final int SHADOW_HELD = 0x50000000;
 
 	/** The hotbar's sprite, for the inventory slot after its end. */
 	private static final Identifier HOTBAR_SPRITE = Identifier.withDefaultNamespace("hud/hotbar");
@@ -72,21 +74,22 @@ public final class TouchButtons {
 	/**
 	 * The pictures, the mod's own: on the {@link #GRID}-unit grid, where the top-left of each sits, then its
 	 * rows. Jump and sneak a caret up and down, flying up and down a double one; sprint an arrow with speed
-	 * lines; attack an upright sword; use an open hand; chat a bubble with two lines of text; pause two bars.
+	 * lines; attack an upright sword with a point; use an open hand; chat a bubble with lines of text; pause
+	 * two bars. Each casts a shadow a unit down and right, worked out from its rows ({@link #rects}).
 	 */
 	enum Icon {
 		JUMP(4, 7,
 				".....##.....",
 				"....####....",
-				"...##..##...",
-				"..##....##..",
-				".##......##.",
-				"##........##"),
+				"...######...",
+				"..###..###..",
+				".###....###.",
+				"###......###"),
 		SNEAK(4, 7,
-				"##........##",
-				".##......##.",
-				"..##....##..",
-				"...##..##...",
+				"###......###",
+				".###....###.",
+				"..###..###..",
+				"...######...",
 				"....####....",
 				".....##....."),
 		FLY_UP(5, 5,
@@ -109,38 +112,41 @@ public final class TouchButtons {
 				"..##..##..",
 				"...####...",
 				"....##...."),
-		SPRINT(4, 5,
-				".......#....",
-				".......##...",
-				"..####.###..",
-				".......####.",
-				"######.#####",
-				".......####.",
-				"..####.###..",
-				".......##...",
-				".......#...."),
-		ATTACK(7, 4,
-				"..##..",
-				"..##..",
-				"..##..",
-				"..##..",
-				"..##..",
-				"..##..",
-				"..##..",
-				"######",
-				"..##..",
-				"..##..",
-				".####."),
+		SPRINT(3, 5,
+				"........#....",
+				"........##...",
+				"...####.###..",
+				"........####.",
+				"######..#####",
+				"........####.",
+				"..#####.###..",
+				"........##...",
+				"........#...."),
+		ATTACK(6, 2,
+				"....#...",
+				"...###..",
+				"...###..",
+				"...###..",
+				"...###..",
+				"...###..",
+				"...###..",
+				"...###..",
+				"...###..",
+				".#######",
+				"....#...",
+				"....#...",
+				"...###..",
+				"....#..."),
 		USE(4, 4,
-				"......##.....",
-				"...##.##.##..",
-				"...##.##.##..",
-				"...##.##.##.#",
-				"##.##.##.##.#",
-				"##.##.##.##.#",
+				"......#......",
+				"...#..#..#...",
+				"...#..#..#..#",
+				"...#..#..#..#",
+				"#..#..#..#..#",
+				"##.########.#",
 				".############",
 				"..###########",
-				"..###########",
+				"..##########.",
 				"...#########.",
 				"....#######..",
 				".....#####..."),
@@ -149,11 +155,11 @@ public final class TouchButtons {
 				"#..........#",
 				"#.########.#",
 				"#..........#",
-				"#.######...#",
+				"#.#####....#",
 				"#..........#",
-				".##########.",
-				"........##..",
-				".........#.."),
+				".######.###.",
+				"......#.#...",
+				"......##...."),
 		PAUSE(6, 5,
 				"###..###",
 				"###..###",
@@ -186,17 +192,19 @@ public final class TouchButtons {
 	}
 
 	/**
-	 * Bedrock's, measured off a 3088 by 1440 screen: the five on the right 198 pixels a side, the top row 95;
-	 * the offsets are its centres' distances from the right edge, the middle and the top, in its units there.
+	 * The five on the right in Bedrock's arrangement - its column pitch, 31.16 of a button's units, and its
+	 * row pitch, 29.09, the inner column half a row higher - hung from the bottom-right corner 5 units clear
+	 * of both edges (Donny, 05:29: tucked into the corner), 0.12 of the window's height a side. Chat and pause
+	 * where Bedrock has them, at the top in the middle, 0.058 a side.
 	 */
 	static final List<Button> BUTTONS = List.of(
-			new Button("jump", Icon.JUMP, 1f, -23.43f, 0.400f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_SOUTH, -1, true),
-			new Button("sprint", Icon.SPRINT, 1f, -54.65f, 0.500f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK, -1, true),
-			new Button("sneak", Icon.SNEAK, 1f, -23.43f, 0.600f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_RIGHT_STICK, -1, true),
-			new Button("attack", Icon.ATTACK, 1f, -54.65f, 0.700f, 0f, 0.1375f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, true),
-			new Button("use", Icon.USE, 1f, -23.43f, 0.8056f, 0f, 0.1375f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, true),
-			new Button("chat", Icon.CHAT, 0.5f, 0f, 0f, 11.26f, 0.066f, SdlGamepad.SDL_GAMEPAD_BUTTON_DPAD_UP, -1, false),
-			new Button("pause", Icon.PAUSE, 0.5f, 21.26f, 0f, 11.26f, 0.066f, SdlGamepad.SDL_GAMEPAD_BUTTON_START, -1, false));
+			new Button("jump", Icon.JUMP, 1f, -15f, 1f, -73.18f, 0.12f, SdlGamepad.SDL_GAMEPAD_BUTTON_SOUTH, -1, true),
+			new Button("sprint", Icon.SPRINT, 1f, -46.16f, 1f, -58.64f, 0.12f, SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK, -1, true),
+			new Button("sneak", Icon.SNEAK, 1f, -15f, 1f, -44.09f, 0.12f, SdlGamepad.SDL_GAMEPAD_BUTTON_RIGHT_STICK, -1, true),
+			new Button("attack", Icon.ATTACK, 1f, -46.16f, 1f, -29.55f, 0.12f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, true),
+			new Button("use", Icon.USE, 1f, -15f, 1f, -15f, 0.12f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, true),
+			new Button("chat", Icon.CHAT, 0.5f, 0f, 0f, 11.26f, 0.058f, SdlGamepad.SDL_GAMEPAD_BUTTON_DPAD_UP, -1, false),
+			new Button("pause", Icon.PAUSE, 0.5f, 21.26f, 0f, 11.26f, 0.058f, SdlGamepad.SDL_GAMEPAD_BUTTON_START, -1, false));
 
 	/** The inventory slot after the hotbar: an index past the buttons, pressing Y - inventory on the default binds. */
 	static final int INVENTORY = BUTTONS.size();
@@ -210,6 +218,9 @@ public final class TouchButtons {
 	static final int HOTBAR_HEIGHT = 22;
 	static final int SLOT_PITCH = 20;
 	static final int SLOT_SIZE = 22;
+
+	/** How high the game stacks its HUD over the hotbar's width, in GUI pixels up from the bottom: the hotbar, the experience bar, health and food, armour and air. */
+	static final int HUD_STACK_HEIGHT = 49;
 
 	/** Each button's frame and picture as rectangles of colour, worked out once. */
 	private static final Map<Icon, int[][]> REST_RECTS = new EnumMap<>(Icon.class);
@@ -266,6 +277,48 @@ public final class TouchButtons {
 		return new Box(centreX - side / 2, centreY - side / 2, unit);
 	}
 
+	/**
+	 * Where a button sits in this frame's window: as {@link #box(Button, int, int)}, with the ones hung from the
+	 * bottom lifted, together, just clear of the hotbar and what the game stacks over it, or of the slot of three
+	 * dots, wherever one of them would reach over it - only a narrow window at a large GUI scale does; at 16:9
+	 * they sit in the corner.
+	 */
+	static Box box(Button button, TouchPad.View view) {
+		Box box = box(button, view.width(), view.height());
+		int lift = button.fromY() == 1f ? lift(view) : 0;
+		return lift == 0 ? box : new Box(box.x(), box.y() - lift, box.unit());
+	}
+
+	/** How far the buttons hung from the bottom go up, a unit clear of the hotbar's stack and the three dots; 0 when none reaches over them, or there is no hotbar. */
+	static int lift(TouchPad.View view) {
+		if (!view.hotbar()) {
+			return 0;
+		}
+		int scale = view.scale();
+		int hotbarLeft = (view.guiWidth() / 2 - HOTBAR_HALF_WIDTH) * scale;
+		int hotbarRight = (view.guiWidth() / 2 + HOTBAR_HALF_WIDTH) * scale;
+		int stackTop = (view.guiHeight() - HUD_STACK_HEIGHT) * scale;
+		int slotLeft = view.inventoryX() * scale;
+		int slotRight = (view.inventoryX() + SLOT_SIZE) * scale;
+		int slotTop = (view.guiHeight() - HOTBAR_HEIGHT - 1) * scale;
+		int lift = 0;
+		for (Button button : BUTTONS) {
+			if (button.fromY() != 1f) {
+				continue;
+			}
+			Box box = box(button, view.width(), view.height());
+			int left = box.x();
+			int right = box.x() + box.side();
+			int bottom = box.y() + box.side() + box.unit();
+			if (left < hotbarRight && right > hotbarLeft) {
+				lift = Math.max(lift, bottom - stackTop);
+			} else if (left < slotRight && right > slotLeft) {
+				lift = Math.max(lift, bottom - slotTop);
+			}
+		}
+		return lift;
+	}
+
 	/** Where the inventory slot's left edge is, in GUI pixels: past the hotbar, and past the offhand slot or the attack indicator when either is on that side. */
 	static int inventoryX(int guiWidth, boolean rightSideTaken) {
 		return guiWidth / 2 + HOTBAR_HALF_WIDTH + 1 + (rightSideTaken ? 29 : 0);
@@ -280,7 +333,7 @@ public final class TouchButtons {
 		float px = finger.x() * view.width();
 		float py = finger.y() * view.height();
 		for (int i = 0; i < BUTTONS.size(); i++) {
-			if (box(BUTTONS.get(i), view.width(), view.height()).contains(px, py)) {
+			if (box(BUTTONS.get(i), view).contains(px, py)) {
 				CLAIMS.put(key, new Claim(i, finger.x(), finger.y()));
 				PRESSED_AT[i] = view.nanos();
 				return true;
@@ -416,7 +469,7 @@ public final class TouchButtons {
 		pose.scale(1f / view.scale(), 1f / view.scale());
 		for (int i = 0; i < BUTTONS.size(); i++) {
 			Button button = BUTTONS.get(i);
-			Box box = box(button, view.width(), view.height());
+			Box box = box(button, view);
 			boolean down = held(i, view.nanos());
 			int[][] rects = (down ? HELD_RECTS : REST_RECTS).get(icon(button, view.flying()));
 			int u = box.unit();
@@ -431,9 +484,10 @@ public final class TouchButtons {
 			int y = view.guiHeight() - HOTBAR_HEIGHT;
 			// The hotbar's own last slot and right end, so it reads as a tenth slot.
 			graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, 182, 22, 160, 0, x, y, SLOT_SIZE, HOTBAR_HEIGHT);
-			graphics.fill(x + 3, y + 3, x + 19, y + 19, held(INVENTORY, view.nanos()) ? 0x80FFFFFF : 0x50FFFFFF);
+			graphics.fill(x + 3, y + 3, x + 19, y + 19, held(INVENTORY, view.nanos()) ? 0x80FFFFFF : 0x40FFFFFF);
 			for (int dot = 0; dot < 3; dot++) {
-				graphics.fill(x + 5 + dot * 5, y + 10, x + 7 + dot * 5, y + 12, 0xFFFFFFFF);
+				graphics.fill(x + 6 + dot * 5, y + 11, x + 8 + dot * 5, y + 13, SHADOW);
+				graphics.fill(x + 5 + dot * 5, y + 10, x + 7 + dot * 5, y + 12, PICTURE | 0xFF000000);
 			}
 		}
 	}
@@ -464,20 +518,21 @@ public final class TouchButtons {
 		return rows;
 	}
 
-	/** The colour of a unit of the frame, or of the picture ('I'), at rest or held; 0 for nothing. */
+	/** The colour of a unit of the frame, of the picture ('I') or of its shadow ('S'), at rest or held; 0 for nothing. */
 	private static int colour(char code, boolean held) {
 		return switch (code) {
 			case 'O' -> held ? OUTLINE_HELD : OUTLINE;
 			case 'F' -> held ? FILL_HELD : FILL;
 			case 'I' -> held ? PICTURE_HELD : PICTURE;
+			case 'S' -> held ? SHADOW_HELD : SHADOW;
 			default -> 0;
 		};
 	}
 
 	/**
-	 * The frame with the picture laid into it, as rectangles {x0, y0, x1, y1, colour} in units: each row cut
-	 * into runs of one colour, and a run joined to the one above it when they match, so nothing is drawn
-	 * twice and a see-through button blends with the world once.
+	 * The frame with the picture and its shadow laid into it, as rectangles {x0, y0, x1, y1, colour} in units:
+	 * each row cut into runs of one colour, and a run joined to the one above it when they match, so nothing
+	 * is drawn twice and a see-through button blends with the world once.
 	 */
 	static int[][] rects(Icon icon, boolean held) {
 		char[][] grid = new char[GRID][];
@@ -489,6 +544,14 @@ public final class TouchButtons {
 			for (int col = 0; col < line.length(); col++) {
 				if (line.charAt(col) == '#') {
 					grid[icon.top + row][icon.left + col] = 'I';
+				}
+			}
+		}
+		// The shadow: the fill a unit down and right of the picture, where the picture does not cover it.
+		for (int y = GRID - 2; y >= 0; y--) {
+			for (int x = GRID - 2; x >= 0; x--) {
+				if (grid[y][x] == 'I' && grid[y + 1][x + 1] == 'F') {
+					grid[y + 1][x + 1] = 'S';
 				}
 			}
 		}

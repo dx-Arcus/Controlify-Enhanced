@@ -76,9 +76,8 @@ public final class TouchPad {
 	/** A swipe across the whole window turns the camera this far, in degrees (180 in tl111: too slow). */
 	static final float LOOK_DEGREES_PER_WIDTH = 360f;
 
-	/** Where the stick rests, as fractions of the window, until a finger lands in its zone. */
-	static final float REST_X = 0.17f;
-	static final float REST_Y = 0.70f;
+	/** Where the stick rests until a finger lands in its zone: this many window heights in from the left and up from the bottom. */
+	static final float REST_FROM_CORNER = 0.17f;
 
 	/** {@code Entity.turn} turns 0.15 degrees per unit it is handed. */
 	private static final float TURN_UNITS_PER_DEGREE = 1f / 0.15f;
@@ -95,9 +94,9 @@ public final class TouchPad {
 	/** A trigger at rest: SDL's virtual gamepad starts its triggers here, and 0 would read as half pulled. */
 	private static final short TRIGGER_REST = -32768;
 
-	private static final int RING = 0x60FFFFFF;
-	private static final int RING_HELD = 0xA0FFFFFF;
-	private static final int KNOB = 0xA0FFFFFF;
+	private static final int RING = 0x80A8A8A8;
+	private static final int RING_HELD = 0xC0D0D0D0;
+	private static final int KNOB = 0xB0C0C0C0;
 	private static final int KNOB_SPRINT = 0xC0FFE060;
 
 	private static boolean active;
@@ -506,13 +505,35 @@ public final class TouchPad {
 		int height = graphics.guiHeight();
 		int radius = Math.round(STICK_RADIUS * height);
 		boolean held = stickFinger != null;
-		int centreX = Math.round((held ? anchorX : REST_X) * width);
-		int centreY = Math.round((held ? anchorY : REST_Y) * height);
+		int[] rest = held ? null : rest(view, width, height, radius);
+		int centreX = held ? Math.round(anchorX * width) : rest[0];
+		int centreY = held ? Math.round(anchorY * height) : rest[1];
 		ring(graphics, centreX, centreY, radius, held ? RING_HELD : RING);
 		int knobX = centreX + Math.round(stickX * radius);
 		int knobY = centreY + Math.round(stickY * radius);
 		disc(graphics, knobX, knobY, Math.max(2, Math.round(radius * 0.35f)), sprinting ? KNOB_SPRINT : KNOB);
 		TouchButtons.render(graphics, view);
+	}
+
+	/**
+	 * Where the stick's ring rests, in GUI pixels: {@link #REST_FROM_CORNER} in from the bottom-left corner - moved
+	 * left, or if it cannot go far enough, up, just clear of the hotbar and what the game stacks over it wherever the
+	 * ring would reach over them (a narrow window at a large GUI scale).
+	 */
+	static int[] rest(View view, int width, int height, int radius) {
+		int x = Math.round(REST_FROM_CORNER * height);
+		int y = height - Math.round(REST_FROM_CORNER * height);
+		int hotbarLeft = width / 2 - TouchButtons.HOTBAR_HALF_WIDTH;
+		int stackTop = height - TouchButtons.HUD_STACK_HEIGHT;
+		if (view.hotbar() && x + radius + 2 > hotbarLeft && y + radius + 2 > stackTop) {
+			int left = hotbarLeft - radius - 2;
+			if (left - radius >= 1) {
+				x = left;
+			} else {
+				y = stackTop - radius - 2;
+			}
+		}
+		return new int[] {x, y};
 	}
 
 	/** A filled circle, a row of pixels at a time. */
