@@ -944,13 +944,13 @@
   "controlify.toast.connection.forgotten.title": "Learned Connections Cleared",
   "controlify.toast.connection.forgotten.description": "Forgot %s recorded path(s). Use the Learn buttons again to teach it.",
   "controlify.gui.dev_functions.touch_mouse_as_finger": "Mouse as Finger",
-  "controlify.gui.dev_functions.touch_mouse_as_finger.tooltip": "Makes the mouse stand in for one finger: the left button held is a finger down, moving it while held is the finger moving, letting go lifts it. The mouse goes on working as a mouse too. For trying touch controls without a touchscreen; press again to turn it off. It only moves while the cursor is free - on a screen, not in the world, where the game holds the cursor still.",
+  "controlify.gui.dev_functions.touch_mouse_as_finger.tooltip": "Makes the mouse stand in for one finger: the left button held is a finger down, moving it while held is the finger moving, letting go lifts it. On a screen the mouse goes on working as a mouse too; in the world, with Touch Controls on, its clicks are only the finger's. For trying touch controls without a touchscreen; press again to turn it off. Without Touch Controls it only moves while the cursor is free - on a screen, not in the world, where the game holds the cursor still.",
   "controlify.gui.dev_functions.touch_show_fingers": "Show Fingers",
   "controlify.gui.dev_functions.touch_show_fingers.tooltip": "Draws every finger the game can see, in the world and over any screen: a dot where it landed, a ring where it is, and at the top left how many are down and how many finger events have arrived. For checking that touch input reaches the mod. Press again to hide it.",
   "controlify.toast.touch.mouse_as_finger": "Mouse as Finger",
   "controlify.toast.touch.show_fingers": "Show Fingers",
   "controlify.gui.dev_functions.touch_controls": "Touch Controls",
-  "controlify.gui.dev_functions.touch_controls.tooltip": "Turns the touch pad on: a stick appears under your left thumb anywhere on the left side of the screen, and swiping on the right turns the camera. Push the stick past its rim to sprint. While it is on, a tap in a menu still clicks. Press again to turn it off. With Mouse as Finger on as well, the mouse stands in for the thumb, and the cursor is left free so that it can.",
+  "controlify.gui.dev_functions.touch_controls.tooltip": "Turns Bedrock's touch controls on: a stick appears under your left thumb anywhere on the left side of the screen, and swiping on the right turns the camera. Push the stick past its rim to sprint. Jump, sprint and sneak are on the right, attack and use below them, and dragging from one of those turns the camera too; chat and pause are at the top; a tap on the hotbar picks a slot, and the slot of three dots after it opens the inventory. While it is on, a tap in a menu still clicks. Press again to turn it off. With Mouse as Finger on as well, the mouse stands in for the thumb, and the cursor is left free so that it can.",
   "controlify.toast.touch.controls": "Touch Controls",
   "controlify.toast.touch.controls.refused": "Could not attach the pad - see the log"
 }

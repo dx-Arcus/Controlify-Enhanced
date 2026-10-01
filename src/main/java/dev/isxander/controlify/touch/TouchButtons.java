@@ -1,0 +1,532 @@
+/*
+ * Copyright (C) 2026 isXander
+ * This file is part of Controlify.
+ *
+ * SPDX-License-Identifier: LGPL-3.0-or-later
+ */
+package dev.isxander.controlify.touch;
+
+import dev.isxander.sdl.SdlGamepad;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import org.joml.Matrix3x2fStack;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Touch controls, the buttons (tl112, tl114): the buttons of Bedrock's "Joystick &amp; aim crosshair"
+ * scheme, where Bedrock puts them, drawn in the mod's own style. Each presses a button of the virtual pad
+ * ({@link TouchPad}) - the one its action is bound to on the default binds - so the mod's bindings, its
+ * toggles and everything downstream take a tap as a press.
+ *
+ * <p>On the right, against the edge: jump, sneak and use; beside them: sprint and attack - Bedrock's
+ * layout with its action buttons shown. At the top in the middle: chat, and pause to its right, where
+ * Bedrock has them (its emote button, left of chat, has no counterpart here). The hotbar's slots select
+ * on a tap, and a slot of three dots after its right end opens the inventory, as Bedrock's does.
+ *
+ * <p>A finger that lands on a button keeps it for as long as it is down, wherever it slides. A finger
+ * dragged from one of the five on the right turns the camera as well, as Bedrock's do, while no other
+ * finger is looking. A tapped button stays pressed for {@link #MIN_PRESS_NANOS} at least: the pad is read
+ * twenty times a second, and a quicker tap could fall between two reads.
+ *
+ * <p>Positions are Bedrock's, measured off its screen. A button is a grid of {@link #GRID} units a side,
+ * its size a fraction of the window's height rounded to a whole number of the window's pixels a unit,
+ * drawn straight into the window's pixels so the edges stay sharp at any GUI scale. Its centre is a
+ * fraction of the window across and down plus an offset in its own units, so the gaps between buttons
+ * grow and shrink with the rounded size and neighbours never close up, at any window size.
+ *
+ * <p>The look is the mod's own and must stay so - nothing is traced from Mojang's art: a see-through dark
+ * square with its corners cut and a white outline, a white picture on it, the colours swapped while it
+ * is held. While the player flies, jump and sneak show up and down.
+ */
+public final class TouchButtons {
+	/** A tapped button stays pressed at least this long, so the controller's tick - twenty a second - sees it. */
+	static final long MIN_PRESS_NANOS = 100_000_000L;
+
+	/** A button is drawn on a grid of this many units a side. */
+	static final int GRID = 20;
+
+	/** What each unit of a button's frame is, row by row: O the outline, F the fill, a space nothing. */
+	static final String[] FRAME = frame();
+
+	/** The colours: the outline, the fill and the picture, at rest and held. */
+	private static final int OUTLINE = 0xC0FFFFFF;
+	private static final int FILL = 0x60000000;
+	private static final int PICTURE = 0xF0FFFFFF;
+	private static final int OUTLINE_HELD = 0xFFFFFFFF;
+	private static final int FILL_HELD = 0xA0FFFFFF;
+	private static final int PICTURE_HELD = 0xE0303030;
+
+	/** The hotbar's sprite, for the inventory slot after its end. */
+	private static final Identifier HOTBAR_SPRITE = Identifier.withDefaultNamespace("hud/hotbar");
+
+	/**
+	 * The pictures, the mod's own: on the {@link #GRID}-unit grid, where the top-left of each sits, then its
+	 * rows. Jump and sneak a caret up and down, flying up and down a double one; sprint an arrow with speed
+	 * lines; attack an upright sword; use an open hand; chat a bubble with two lines of text; pause two bars.
+	 */
+	enum Icon {
+		JUMP(4, 7,
+				".....##.....",
+				"....####....",
+				"...##..##...",
+				"..##....##..",
+				".##......##.",
+				"##........##"),
+		SNEAK(4, 7,
+				"##........##",
+				".##......##.",
+				"..##....##..",
+				"...##..##...",
+				"....####....",
+				".....##....."),
+		FLY_UP(5, 5,
+				"....##....",
+				"...####...",
+				"..##..##..",
+				".##....##.",
+				"##..##..##",
+				"...####...",
+				"..##..##..",
+				".##....##.",
+				"##......##"),
+		FLY_DOWN(5, 6,
+				"##......##",
+				".##....##.",
+				"..##..##..",
+				"...####...",
+				"##..##..##",
+				".##....##.",
+				"..##..##..",
+				"...####...",
+				"....##...."),
+		SPRINT(4, 5,
+				".......#....",
+				".......##...",
+				"..####.###..",
+				".......####.",
+				"######.#####",
+				".......####.",
+				"..####.###..",
+				".......##...",
+				".......#...."),
+		ATTACK(7, 4,
+				"..##..",
+				"..##..",
+				"..##..",
+				"..##..",
+				"..##..",
+				"..##..",
+				"..##..",
+				"######",
+				"..##..",
+				"..##..",
+				".####."),
+		USE(4, 4,
+				"......##.....",
+				"...##.##.##..",
+				"...##.##.##..",
+				"...##.##.##.#",
+				"##.##.##.##.#",
+				"##.##.##.##.#",
+				".############",
+				"..###########",
+				"..###########",
+				"...#########.",
+				"....#######..",
+				".....#####..."),
+		CHAT(4, 5,
+				".##########.",
+				"#..........#",
+				"#.########.#",
+				"#..........#",
+				"#.######...#",
+				"#..........#",
+				".##########.",
+				"........##..",
+				".........#.."),
+		PAUSE(6, 5,
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###",
+				"###..###");
+
+		final int left;
+		final int top;
+		final String[] rows;
+
+		Icon(int left, int top, String... rows) {
+			this.left = left;
+			this.top = top;
+			this.rows = rows;
+		}
+	}
+
+	/**
+	 * One button: its picture; its centre, {@code fromX} of the window's width across and {@code fromY} of its
+	 * height down, each plus an offset in the button's own units; its side in window heights; what it
+	 * presses - a pad button, or a trigger when {@code axis} is not -1; and whether a drag from it looks.
+	 */
+	record Button(String name, Icon icon, float fromX, float offsetX, float fromY, float offsetY, float size, int button, int axis, boolean looks) {
+	}
+
+	/**
+	 * Bedrock's, measured off a 3088 by 1440 screen: the five on the right 198 pixels a side, the top row 95;
+	 * the offsets are its centres' distances from the right edge, the middle and the top, in its units there.
+	 */
+	static final List<Button> BUTTONS = List.of(
+			new Button("jump", Icon.JUMP, 1f, -23.43f, 0.400f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_SOUTH, -1, true),
+			new Button("sprint", Icon.SPRINT, 1f, -54.65f, 0.500f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK, -1, true),
+			new Button("sneak", Icon.SNEAK, 1f, -23.43f, 0.600f, 0f, 0.1375f, SdlGamepad.SDL_GAMEPAD_BUTTON_RIGHT_STICK, -1, true),
+			new Button("attack", Icon.ATTACK, 1f, -54.65f, 0.700f, 0f, 0.1375f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, true),
+			new Button("use", Icon.USE, 1f, -23.43f, 0.8056f, 0f, 0.1375f, -1, SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, true),
+			new Button("chat", Icon.CHAT, 0.5f, 0f, 0f, 11.26f, 0.066f, SdlGamepad.SDL_GAMEPAD_BUTTON_DPAD_UP, -1, false),
+			new Button("pause", Icon.PAUSE, 0.5f, 21.26f, 0f, 11.26f, 0.066f, SdlGamepad.SDL_GAMEPAD_BUTTON_START, -1, false));
+
+	/** The inventory slot after the hotbar: an index past the buttons, pressing Y - inventory on the default binds. */
+	static final int INVENTORY = BUTTONS.size();
+	private static final int INVENTORY_BUTTON = SdlGamepad.SDL_GAMEPAD_BUTTON_NORTH;
+
+	/** A finger on the hotbar: no button, a slot instead. */
+	private static final int HOTBAR = -1;
+
+	/** The hotbar, as the game draws it: 182 wide, 22 high, its nine slots 20 apart from one pixel in. */
+	static final int HOTBAR_HALF_WIDTH = 91;
+	static final int HOTBAR_HEIGHT = 22;
+	static final int SLOT_PITCH = 20;
+	static final int SLOT_SIZE = 22;
+
+	/** Each button's frame and picture as rectangles of colour, worked out once. */
+	private static final Map<Icon, int[][]> REST_RECTS = new EnumMap<>(Icon.class);
+	private static final Map<Icon, int[][]> HELD_RECTS = new EnumMap<>(Icon.class);
+
+	static {
+		for (Icon icon : Icon.values()) {
+			REST_RECTS.put(icon, rects(icon, false));
+			HELD_RECTS.put(icon, rects(icon, true));
+		}
+	}
+
+	/** What a finger on the buttons has: which button (or the hotbar), and where it was last frame, for the look. */
+	private static final class Claim {
+		final int button;
+		float lastX;
+		float lastY;
+
+		Claim(int button, float x, float y) {
+			this.button = button;
+			this.lastX = x;
+			this.lastY = y;
+		}
+	}
+
+	private static final Map<TouchPad.FingerKey, Claim> CLAIMS = new LinkedHashMap<>();
+
+	/** When each button - and the inventory slot, last - was last pressed, for the shortest press; 0 for never. */
+	private static final long[] PRESSED_AT = new long[BUTTONS.size() + 1];
+
+	/** The hotbar slot a finger asked for since it was last taken, or -1. */
+	private static int slotWanted = -1;
+
+	private TouchButtons() {
+	}
+
+	/** A button's square in the window's pixels: its top left and the size of one of its units. */
+	record Box(int x, int y, int unit) {
+		int side() {
+			return unit * GRID;
+		}
+
+		boolean contains(float px, float py) {
+			return px >= x && px < x + side() && py >= y && py < y + side();
+		}
+	}
+
+	/** Where a button sits in a window of this many pixels. */
+	static Box box(Button button, int width, int height) {
+		int unit = Math.max(1, Math.round(button.size() * height / GRID));
+		int side = unit * GRID;
+		int centreX = Math.round(button.fromX() * width + button.offsetX() * unit);
+		int centreY = Math.round(button.fromY() * height + button.offsetY() * unit);
+		return new Box(centreX - side / 2, centreY - side / 2, unit);
+	}
+
+	/** Where the inventory slot's left edge is, in GUI pixels: past the hotbar, and past the offhand slot or the attack indicator when either is on that side. */
+	static int inventoryX(int guiWidth, boolean rightSideTaken) {
+		return guiWidth / 2 + HOTBAR_HALF_WIDTH + 1 + (rightSideTaken ? 29 : 0);
+	}
+
+	/**
+	 * A finger has just landed: if it is on a button, the hotbar or the inventory slot, it is ours from now
+	 * until it lifts. True if it is.
+	 */
+	static boolean claim(TouchInput.Finger finger, TouchPad.View view) {
+		TouchPad.FingerKey key = TouchPad.FingerKey.of(finger);
+		float px = finger.x() * view.width();
+		float py = finger.y() * view.height();
+		for (int i = 0; i < BUTTONS.size(); i++) {
+			if (box(BUTTONS.get(i), view.width(), view.height()).contains(px, py)) {
+				CLAIMS.put(key, new Claim(i, finger.x(), finger.y()));
+				PRESSED_AT[i] = view.nanos();
+				return true;
+			}
+		}
+		if (!view.hotbar()) {
+			return false;
+		}
+		float gx = px / view.scale();
+		float gy = py / view.scale();
+		if (gy < view.guiHeight() - HOTBAR_HEIGHT) {
+			return false;
+		}
+		if (gx >= view.inventoryX() && gx < view.inventoryX() + SLOT_SIZE) {
+			CLAIMS.put(key, new Claim(INVENTORY, finger.x(), finger.y()));
+			PRESSED_AT[INVENTORY] = view.nanos();
+			return true;
+		}
+		int slot = slotAt(gx, view.guiWidth());
+		if (slot < 0) {
+			return false;
+		}
+		CLAIMS.put(key, new Claim(HOTBAR, finger.x(), finger.y()));
+		slotWanted = slot;
+		return true;
+	}
+
+	/** The hotbar slot under this many GUI pixels across, or -1 when it is off the hotbar's ends. */
+	static int slotAt(float gx, int guiWidth) {
+		float left = guiWidth / 2 - HOTBAR_HALF_WIDTH;
+		if (gx < left || gx >= left + 2 * HOTBAR_HALF_WIDTH) {
+			return -1;
+		}
+		return Math.min(8, (int) ((gx - left) / SLOT_PITCH));
+	}
+
+	/** Whether this finger is ours. */
+	static boolean owns(TouchPad.FingerKey key) {
+		return CLAIMS.containsKey(key);
+	}
+
+	/**
+	 * Every frame, with the fingers that are down: the lifted ones are let go; a finger on the hotbar
+	 * selects the slot it has slid to while it stays on the hotbar; and the first finger that landed on a
+	 * button that looks, of those still down, says how far it moved since last frame - as fractions of the
+	 * window, or null when there is none. Every finger's last position is brought up to date either way, so
+	 * when the look passes to one there is no jump.
+	 */
+	static float[] update(List<TouchInput.Finger> fingers, TouchPad.View view) {
+		Set<TouchPad.FingerKey> down = new HashSet<>();
+		for (TouchInput.Finger finger : fingers) {
+			down.add(TouchPad.FingerKey.of(finger));
+		}
+		CLAIMS.keySet().retainAll(down);
+
+		float[] drag = null;
+		for (TouchInput.Finger finger : fingers) {
+			Claim claim = CLAIMS.get(TouchPad.FingerKey.of(finger));
+			if (claim == null) {
+				continue;
+			}
+			if (claim.button == HOTBAR && view.hotbar()) {
+				float gy = finger.y() * view.height() / view.scale();
+				int slot = slotAt(finger.x() * view.width() / view.scale(), view.guiWidth());
+				if (slot >= 0 && gy >= view.guiHeight() - HOTBAR_HEIGHT) {
+					slotWanted = slot;
+				}
+			}
+			if (drag == null && claim.button >= 0 && claim.button < INVENTORY && BUTTONS.get(claim.button).looks()) {
+				drag = new float[] {finger.x() - claim.lastX, finger.y() - claim.lastY};
+			}
+			claim.lastX = finger.x();
+			claim.lastY = finger.y();
+		}
+		return drag;
+	}
+
+	/** Whether a button - or the inventory slot, {@link #INVENTORY} - is pressed: a finger on it, or tapped too recently to let go. */
+	static boolean held(int index, long now) {
+		for (Claim claim : CLAIMS.values()) {
+			if (claim.button == index) {
+				return true;
+			}
+		}
+		return PRESSED_AT[index] != 0 && now - PRESSED_AT[index] < MIN_PRESS_NANOS;
+	}
+
+	/** The pad's buttons the buttons hold down, as a mask of SDL's gamepad buttons. */
+	static int buttonMask(long now) {
+		int mask = 0;
+		for (int i = 0; i < BUTTONS.size(); i++) {
+			Button button = BUTTONS.get(i);
+			if (button.button() >= 0 && held(i, now)) {
+				mask |= 1 << button.button();
+			}
+		}
+		if (held(INVENTORY, now)) {
+			mask |= 1 << INVENTORY_BUTTON;
+		}
+		return mask;
+	}
+
+	/** Whether the button pulling this trigger is held. */
+	static boolean trigger(int axis, long now) {
+		for (int i = 0; i < BUTTONS.size(); i++) {
+			if (BUTTONS.get(i).axis() == axis && held(i, now)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** The hotbar slot a finger asked for since the last call, or -1; asking again for the same slot asks again. */
+	static int takeSlot() {
+		int slot = slotWanted;
+		slotWanted = -1;
+		return slot;
+	}
+
+	/** Lets go of every finger and every press, a tap's shortest press too: a screen is up, or touch is off. */
+	static void letGo() {
+		CLAIMS.clear();
+		Arrays.fill(PRESSED_AT, 0L);
+		slotWanted = -1;
+	}
+
+	/**
+	 * Draws the buttons into the window's own pixels (the GUI is {@code scale} pixels a unit, so the pose is
+	 * scaled down by it), then the inventory slot in GUI pixels after the hotbar's end.
+	 */
+	static void render(GuiGraphicsExtractor graphics, TouchPad.View view) {
+		Matrix3x2fStack pose = graphics.pose().pushMatrix();
+		pose.scale(1f / view.scale(), 1f / view.scale());
+		for (int i = 0; i < BUTTONS.size(); i++) {
+			Button button = BUTTONS.get(i);
+			Box box = box(button, view.width(), view.height());
+			boolean down = held(i, view.nanos());
+			int[][] rects = (down ? HELD_RECTS : REST_RECTS).get(icon(button, view.flying()));
+			int u = box.unit();
+			for (int[] r : rects) {
+				graphics.fill(box.x() + r[0] * u, box.y() + r[1] * u, box.x() + r[2] * u, box.y() + r[3] * u, r[4]);
+			}
+		}
+		pose.popMatrix();
+
+		if (view.hotbar()) {
+			int x = view.inventoryX();
+			int y = view.guiHeight() - HOTBAR_HEIGHT;
+			// The hotbar's own last slot and right end, so it reads as a tenth slot.
+			graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, 182, 22, 160, 0, x, y, SLOT_SIZE, HOTBAR_HEIGHT);
+			graphics.fill(x + 3, y + 3, x + 19, y + 19, held(INVENTORY, view.nanos()) ? 0x80FFFFFF : 0x50FFFFFF);
+			for (int dot = 0; dot < 3; dot++) {
+				graphics.fill(x + 5 + dot * 5, y + 10, x + 7 + dot * 5, y + 12, 0xFFFFFFFF);
+			}
+		}
+	}
+
+	/** The picture a button shows: jump and sneak show flying up and down while the player flies. */
+	static Icon icon(Button button, boolean flying) {
+		if (flying && button.icon() == Icon.JUMP) {
+			return Icon.FLY_UP;
+		}
+		if (flying && button.icon() == Icon.SNEAK) {
+			return Icon.FLY_DOWN;
+		}
+		return button.icon();
+	}
+
+	/** The frame, unit by unit: a one-unit outline round a fill, its corners cut two units. */
+	private static String[] frame() {
+		String[] rows = new String[GRID];
+		for (int y = 0; y < GRID; y++) {
+			if (y == 0 || y == GRID - 1) {
+				rows[y] = "  " + "O".repeat(GRID - 4) + "  ";
+			} else if (y == 1 || y == GRID - 2) {
+				rows[y] = " O" + "F".repeat(GRID - 4) + "O ";
+			} else {
+				rows[y] = "O" + "F".repeat(GRID - 2) + "O";
+			}
+		}
+		return rows;
+	}
+
+	/** The colour of a unit of the frame, or of the picture ('I'), at rest or held; 0 for nothing. */
+	private static int colour(char code, boolean held) {
+		return switch (code) {
+			case 'O' -> held ? OUTLINE_HELD : OUTLINE;
+			case 'F' -> held ? FILL_HELD : FILL;
+			case 'I' -> held ? PICTURE_HELD : PICTURE;
+			default -> 0;
+		};
+	}
+
+	/**
+	 * The frame with the picture laid into it, as rectangles {x0, y0, x1, y1, colour} in units: each row cut
+	 * into runs of one colour, and a run joined to the one above it when they match, so nothing is drawn
+	 * twice and a see-through button blends with the world once.
+	 */
+	static int[][] rects(Icon icon, boolean held) {
+		char[][] grid = new char[GRID][];
+		for (int y = 0; y < GRID; y++) {
+			grid[y] = FRAME[y].toCharArray();
+		}
+		for (int row = 0; row < icon.rows.length; row++) {
+			String line = icon.rows[row];
+			for (int col = 0; col < line.length(); col++) {
+				if (line.charAt(col) == '#') {
+					grid[icon.top + row][icon.left + col] = 'I';
+				}
+			}
+		}
+		List<int[]> done = new ArrayList<>();
+		List<int[]> open = new ArrayList<>();
+		for (int y = 0; y < GRID; y++) {
+			List<int[]> next = new ArrayList<>();
+			int x = 0;
+			while (x < GRID) {
+				char code = grid[y][x];
+				int end = x + 1;
+				while (end < GRID && grid[y][end] == code) {
+					end++;
+				}
+				int colour = colour(code, held);
+				if (colour != 0) {
+					int[] joined = null;
+					for (Iterator<int[]> it = open.iterator(); it.hasNext(); ) {
+						int[] r = it.next();
+						if (r[0] == x && r[2] == end && r[4] == colour) {
+							joined = r;
+							it.remove();
+							break;
+						}
+					}
+					if (joined == null) {
+						joined = new int[] {x, y, end, y + 1, colour};
+					} else {
+						joined[3] = y + 1;
+					}
+					next.add(joined);
+				}
+				x = end;
+			}
+			done.addAll(open);
+			open = next;
+		}
+		done.addAll(open);
+		return done.toArray(new int[0][]);
+	}
+}

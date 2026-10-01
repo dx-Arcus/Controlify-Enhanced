@@ -14,6 +14,7 @@ import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.InputMode;
 import dev.isxander.controlify.api.ControlifyApi;
 import dev.isxander.controlify.touch.TouchPad;
+import dev.isxander.controlify.utils.MinecraftUtil;
 import dev.isxander.controlify.utils.MouseMinecraftCallNotifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
@@ -113,6 +114,18 @@ public class MouseHandlerMixin implements MouseMinecraftCallNotifier {
 	@Inject(method = "grabMouse", at = @At("HEAD"), cancellable = true)
 	private void keepCursorFreeForTouch(CallbackInfo ci) {
 		if (TouchPad.cursorFree()) {
+			ci.cancel();
+		}
+	}
+
+	/**
+	 * While the mouse stands in for a finger, its own clicks do nothing in the world (tl112): SDL has made a
+	 * finger of each already, which the touch controls read, and the click would attack or use as well. On
+	 * a screen they click as ever.
+	 */
+	@Inject(method = "onButton", at = @At("HEAD"), cancellable = true)
+	private void swallowClickForTouch(CallbackInfo ci) {
+		if (TouchPad.cursorFree() && MinecraftUtil.getScreen() == null) {
 			ci.cancel();
 		}
 	}
