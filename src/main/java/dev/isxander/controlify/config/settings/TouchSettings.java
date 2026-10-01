@@ -7,12 +7,14 @@
 package dev.isxander.controlify.config.settings;
 
 import dev.isxander.controlify.config.dto.TouchConfig;
+import dev.isxander.controlify.touch.TouchMode;
 import net.minecraft.util.Mth;
 
 /**
- * The touch controls' layout, live (tl117): edited in the glyph editor's Touch tab and read every frame
- * by the touch controls. Offsets are fractions of the window's height, right and down positive; sizes
- * are fractions of the default size, {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
+ * The touch controls' settings, live: the layout (tl117), edited in the glyph editor's Touch tab, and the mode
+ * (tl118), switched for now by the Dev Functions panel's Touch Mode - both read every frame by the touch controls.
+ * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
+ * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */
 public class TouchSettings {
 	public float stickOffsetX;
@@ -21,15 +23,17 @@ public class TouchSettings {
 	public float buttonsOffsetX;
 	public float buttonsOffsetY;
 	public float buttonSize;
+	public TouchMode mode;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize,
-			float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
+			float buttonsOffsetX, float buttonsOffsetY, float buttonSize, TouchMode mode) {
 		this.stickOffsetX = stickOffsetX;
 		this.stickOffsetY = stickOffsetY;
 		this.stickSize = size(stickSize);
 		this.buttonsOffsetX = buttonsOffsetX;
 		this.buttonsOffsetY = buttonsOffsetY;
 		this.buttonSize = size(buttonSize);
+		this.mode = mode == null ? TouchMode.CROSSHAIR : mode;
 	}
 
 	/** A size within what the Touch tab offers; a number that is not one at all is the default. */
@@ -43,11 +47,11 @@ public class TouchSettings {
 
 	public static TouchSettings fromDTO(TouchConfig dto) {
 		return new TouchSettings(offset(dto.stickOffsetX()), offset(dto.stickOffsetY()), dto.stickSize(),
-				offset(dto.buttonsOffsetX()), offset(dto.buttonsOffsetY()), dto.buttonSize());
+				offset(dto.buttonsOffsetX()), offset(dto.buttonsOffsetY()), dto.buttonSize(), dto.mode());
 	}
 
 	public TouchConfig toDTO() {
-		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize);
+		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode);
 	}
 
 	/** An offset as read: a number that is not one at all is none. */

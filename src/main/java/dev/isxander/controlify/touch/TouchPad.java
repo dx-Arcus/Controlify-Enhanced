@@ -44,7 +44,9 @@ import java.util.Set;
 /**
  * Touch controls, the pad (tl111): a floating stick under the left thumb and a look region under the
  * right, Bedrock's "Joystick & Aim Crosshair" scheme; its buttons and the hotbar are {@link TouchButtons}
- * (tl112), offered every finger first.
+ * (tl112), offered every finger first. In tap mode (tl118, {@link TouchMode}), Bedrock's "Joystick &amp; Tap
+ * to Interact": no crosshair, the stick taking only a finger that lands on its ring, and a finger on the
+ * world tapping, holding or looking ({@link TouchTap}), with a ring round a finger held there.
  *
  * <p>The stick is a real controller as far as the rest of the mod is concerned: a virtual gamepad
  * attached to Controlify's own SDL - the one its controllers come from, not the game's - of the
@@ -69,7 +71,8 @@ import java.util.Set;
  * pad lets go, the screens' controller glyphs are not drawn, and a close button stands in for Esc
  * ({@link #renderScreen}, {@link #closeTapped}, tl116). Switched by the Dev Functions panel's Touch
  * Controls for now, and not saved. Where the stick rests and the buttons sit, and how big each is, the
- * player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117).
+ * player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117); so is the mode,
+ * switched for now by the panel's Touch Mode (tl118).
  */
 public final class TouchPad {
 	/** How far from the left edge, as a fraction of the window's width, a finger landing becomes the stick - as does one landing on its ring where it rests ({@link #onRest}). */
@@ -106,6 +109,12 @@ public final class TouchPad {
 	private static final int RING_HELD = 0xC0D0D0D0;
 	private static final int KNOB = 0xB0C0C0C0;
 	private static final int KNOB_SPRINT = 0xC0FFE060;
+	/** The hold ring round a finger held on the world (tl118), and the part of it the block's breaking has reached. */
+	private static final int HOLD_RING = 0x90FFFFFF;
+	private static final int HOLD_DONE = 0xFFFFFFFF;
+
+	/** The hold ring's radius, as a fraction of the window's height. */
+	static final float HOLD_RING_RADIUS = 0.05f;
 
 	private static boolean active;
 	private static @Nullable SdlJoystickId padId;
@@ -176,12 +185,23 @@ public final class TouchPad {
 	/**
 	 * The window a frame of fingers is read against: its size in pixels and in GUI pixels, the GUI scale,
 	 * whether the hotbar is there to tap (no spectators), where the inventory slot after it is, whether the
-	 * player is flying (jump and sneak show up and down), the time, and the player's layout.
+	 * player is flying (jump and sneak show up and down), the time, the player's layout, and the mode they
+	 * play in (tl118).
 	 */
-	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout) {
+	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode) {
 		/** The same window with the default layout. */
 		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos) {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, Layout.DEFAULT);
+		}
+
+		/** The same window with this layout, in the mode every build before tl118 played. */
+		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout) {
+			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, TouchMode.CROSSHAIR);
+		}
+
+		/** Whether a tap on the world uses and attacks, and a hold breaks (tl118). */
+		boolean tap() {
+			return mode == TouchMode.TAP;
 		}
 
 		float aspect() {
@@ -200,6 +220,14 @@ public final class TouchPad {
 	/** Whether touch controls are on. */
 	public static boolean active() {
 		return active;
+	}
+
+	/**
+	 * Whether touch controls are on and play Joystick &amp; tap to interact (tl118): no crosshair, the game's pick
+	 * following the finger ({@link TouchTap#pick}), and no aim assist.
+	 */
+	public static boolean tapMode() {
+		return active && mode() == TouchMode.TAP;
 	}
 
 	/**
@@ -310,6 +338,8 @@ public final class TouchPad {
 			heldOver(TouchInput.fingers());
 			return;
 		}
+		TouchTap.breakProgress(minecraft.gameMode != null && minecraft.gameMode.isDestroying()
+				? (minecraft.gameMode.getDestroyStage() + 1) / 10f : 0f);
 		Turn turn = readFingers(TouchInput.fingers(), view(minecraft));
 		int slot = TouchButtons.takeSlot();
 		if (slot >= 0) {
@@ -337,13 +367,19 @@ public final class TouchPad {
 		boolean flying = player != null && player.getAbilities().flying;
 		int guiWidth = window.getGuiScaledWidth();
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout);
+				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, mode());
 	}
 
 	/** The layout the player saved, or the default before there is a config to read it from. */
 	static Layout layout() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? Layout.DEFAULT : Layout.of(config.getSettings().touchSettings());
+	}
+
+	/** The mode the player chose (tl118), or aim crosshair before there is a config to read it from. */
+	static TouchMode mode() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TouchMode.CROSSHAIR : config.getSettings().touchSettings().mode;
 	}
 
 	/** While a screen is up: the fingers down now are nobody's until they lift. */
@@ -378,6 +414,18 @@ public final class TouchPad {
 	 * finger, or while there is none by a finger dragged from a button. Positions are fractions of the window.
 	 */
 	static Turn readFingers(List<TouchInput.Finger> fingers, View view) {
+		return readFingers(fingers, view, TouchTap.GAME);
+	}
+
+	/**
+	 * {@link #readFingers(List, View)}, with what a finger on the world touches in tap mode given (tl118) - for tests.
+	 * In tap mode the stick takes only a finger landing on its ring, so the rest of the left side is world as well;
+	 * a finger that lands on the world is offered to {@link TouchTap} first, to tap or hold - which hands it back as
+	 * the look if it moves, or once its hold is done - and only one landing while that one is down is the look at
+	 * once; a finger holding to use turns the camera while no finger is the look and none is dragged from a button;
+	 * and the triggers are pulled by the taps and holds as well.
+	 */
+	static Turn readFingers(List<TouchInput.Finger> fingers, View view, TouchTap.Target target) {
 		float aspect = view.aspect();
 		Set<FingerKey> down = new HashSet<>();
 		for (TouchInput.Finger finger : fingers) {
@@ -400,17 +448,21 @@ public final class TouchPad {
 		}
 		for (TouchInput.Finger finger : fingers) {
 			FingerKey key = FingerKey.of(finger);
-			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)) {
+			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)
+					|| TouchTap.owns(key)) {
 				continue;
 			}
-			if (!seen.contains(key) && TouchButtons.claim(finger, view)) {
+			boolean landed = !seen.contains(key);
+			if (landed && TouchButtons.claim(finger, view)) {
 				continue;
 			}
-			if (stick == null && (finger.x() < STICK_ZONE || onRest(finger, view))) {
+			if (stick == null && (view.tap() ? onRest(finger, view) : (finger.x() < STICK_ZONE || onRest(finger, view)))) {
 				stickFinger = key;
 				anchorX = finger.x();
 				anchorY = finger.y();
 				stick = finger;
+			} else if (view.tap() && landed && TouchTap.free()) {
+				TouchTap.land(finger, view.nanos());
 			} else if (look == null) {
 				lookFinger = key;
 				lookX = finger.x();
@@ -436,8 +488,35 @@ public final class TouchPad {
 
 		float[] drag = TouchButtons.update(fingers, view);
 		long now = view.nanos();
+		boolean useHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, now);
+		boolean attackHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, now);
+		if (view.tap()) {
+			TouchTap.update(fingers, view, target);
+			FingerKey handed = TouchTap.takeLook();
+			if (handed != null) {
+				TouchInput.Finger finger = null;
+				for (TouchInput.Finger candidate : fingers) {
+					if (handed.equals(FingerKey.of(candidate))) {
+						finger = candidate;
+					}
+				}
+				if (look == null && finger != null) {
+					lookFinger = handed;
+					lookX = TouchTap.lookFromX();
+					lookY = TouchTap.lookFromY();
+					look = finger;
+				} else {
+					HELD_OVER.add(handed);
+				}
+			}
+			if (drag == null) {
+				drag = TouchTap.drag();
+			}
+			useHeld |= TouchTap.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+			attackHeld |= TouchTap.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+		}
 		writeButtons(TouchButtons.buttonMask(now) | (sprinting ? 1 << SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK : 0));
-		writeTriggers(TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, now), TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, now));
+		writeTriggers(useHeld, attackHeld);
 
 		if (look == null) {
 			lookFinger = null;
@@ -529,6 +608,7 @@ public final class TouchPad {
 		lookFinger = null;
 		writeStick(0f, 0f, false);
 		TouchButtons.letGo();
+		TouchTap.letGo();
 		writeButtons(0);
 		writeTriggers(false, false);
 	}
@@ -604,17 +684,22 @@ public final class TouchPad {
 	 */
 	public static Layout keptInside(Layout layout) {
 		Window window = Minecraft.getInstance().getWindow();
-		return keptInside(layout, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(), window.getGuiScaledHeight());
+		return keptInside(layout, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(), window.getGuiScaledHeight(), mode());
 	}
 
 	/** {@link #keptInside(Layout)}, against a given window - for tests. */
 	static Layout keptInside(Layout layout, int width, int height, int guiWidth, int guiHeight) {
+		return keptInside(layout, width, height, guiWidth, guiHeight, TouchMode.CROSSHAIR);
+	}
+
+	/** {@link #keptInside(Layout)}, against a given window, for the buttons there are in this mode (tl118) - for tests. */
+	static Layout keptInside(Layout layout, int width, int height, int guiWidth, int guiHeight, TouchMode mode) {
 		float gui = guiHeight;
 		int radius = Math.round(STICK_RADIUS * layout.stickSize() * guiHeight);
 		int fromCorner = Math.round(REST_FROM_CORNER * layout.stickSize() * guiHeight);
 		float stickX = within(layout.stickX(), (radius - fromCorner) / gui, (guiWidth - radius - 1 - fromCorner) / gui);
 		float stickY = within(layout.stickY(), (radius - guiHeight + fromCorner) / gui, (fromCorner - radius - 1) / gui);
-		int[] unmoved = TouchButtons.bounds(width, height, new Layout(0f, 0f, 1f, 0f, 0f, layout.buttonSize()));
+		int[] unmoved = TouchButtons.bounds(width, height, new Layout(0f, 0f, 1f, 0f, 0f, layout.buttonSize()), mode);
 		float buttonsX = within(layout.buttonsX(), -unmoved[0] / (float) height, (width - unmoved[2]) / (float) height);
 		float buttonsY = within(layout.buttonsY(), -unmoved[1] / (float) height, (height - unmoved[3]) / (float) height);
 		return new Layout(stickX, stickY, layout.stickSize(), buttonsX, buttonsY, layout.buttonSize());
@@ -635,6 +720,12 @@ public final class TouchPad {
 	static void draw(GuiGraphicsExtractor graphics, View view) {
 		drawStick(graphics, view);
 		TouchButtons.render(graphics, view, false);
+		float[] ring = view.tap() ? TouchTap.ring() : null;
+		if (ring != null) {
+			int width = graphics.guiWidth();
+			int height = graphics.guiHeight();
+			holdRing(graphics, Math.round(ring[0] * width), Math.round(ring[1] * height), Math.round(HOLD_RING_RADIUS * height), ring[2]);
+		}
 	}
 
 	/** The stick's ring, where it rests or where the thumb landed, and its knob. */
@@ -689,6 +780,53 @@ public final class TouchPad {
 		}
 	}
 
+	/**
+	 * The hold ring (tl118): a circle two pixels thick round a finger held on the world - every pixel whose centre is
+	 * at least the radius less a pixel and a half from the ring's centre and less than the radius and a half, so its
+	 * top, foot and sides are flat runs rather than single pixels - with as much of it as the block under the finger
+	 * has broken, from the top, clockwise, drawn bright. Each row's runs are cut where the bright part ends, so nothing
+	 * is drawn twice.
+	 */
+	static void holdRing(GuiGraphicsExtractor graphics, int cx, int cy, int r, float progress) {
+		double reach = Math.max(0f, Math.min(progress, 1f)) * 2 * Math.PI;
+		double outerSq = (r + 0.5) * (r + 0.5);
+		double innerSq = (r - 1.5) * (r - 1.5);
+		for (int dy = -r; dy <= r; dy++) {
+			int outer = (int) Math.ceil(Math.sqrt(outerSq - (double) dy * dy)) - 1;
+			double inside = innerSq - (double) dy * dy;
+			int inner = inside <= 0 ? 0 : (int) Math.ceil(Math.sqrt(inside));
+			if (inner == 0) {
+				arcRow(graphics, cx, cy, dy, -outer, outer, reach);
+			} else if (inner <= outer) {
+				arcRow(graphics, cx, cy, dy, -outer, -inner, reach);
+				arcRow(graphics, cx, cy, dy, inner, outer, reach);
+			}
+		}
+	}
+
+	/** One run of the hold ring's row, from {@code from} to {@code to} across the centre, cut where the bright part ends. */
+	private static void arcRow(GuiGraphicsExtractor graphics, int cx, int cy, int dy, int from, int to, double reach) {
+		int start = from;
+		boolean bright = brightAt(from, dy, reach);
+		for (int dx = from + 1; dx <= to + 1; dx++) {
+			boolean next = dx <= to && brightAt(dx, dy, reach);
+			if (dx > to || next != bright) {
+				graphics.fill(cx + start, cy + dy, cx + dx, cy + dy + 1, bright ? HOLD_DONE : HOLD_RING);
+				start = dx;
+				bright = next;
+			}
+		}
+	}
+
+	/** Whether a pixel of the hold ring, this far across and down from its centre, is within the bright part: clockwise from the top. */
+	private static boolean brightAt(int dx, int dy, double reach) {
+		double angle = Math.atan2(dx, -dy);
+		if (angle < 0) {
+			angle += 2 * Math.PI;
+		}
+		return angle < reach;
+	}
+
 	/** A circle two pixels thick. */
 	private static void ring(GuiGraphicsExtractor graphics, int cx, int cy, int r, int color) {
 		for (int dy = -r; dy <= r; dy++) {
@@ -729,6 +867,7 @@ public final class TouchPad {
 		HELD_OVER.clear();
 		SEEN.clear();
 		TouchButtons.letGo();
+		TouchTap.letGo();
 	}
 
 	/** For tests: the pad's buttons and triggers as last written. */

@@ -10,6 +10,7 @@ import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.bind.InputBinding;
 import dev.isxander.controlify.bindings.KeyMappingHandle;
 import dev.isxander.controlify.config.settings.AimAssistSettings;
+import dev.isxander.controlify.touch.TouchPad;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.HitResult;
@@ -44,8 +45,9 @@ public final class SwingTiming {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
 		AimAssistSettings settings = Controlify.instance().config().getSettings().aimAssistSettings();
+		// Not in tap mode, where aim assist is off (tl118): a finger picks what is attacked there.
 		if (player == null || !settings.swingTiming || settings.mode == AimAssistMode.OFF
-				|| !settings.mode.canAimAssist() || player.isSpectator()) {
+				|| !settings.mode.canAimAssist() || player.isSpectator() || TouchPad.tapMode()) {
 			running = false;
 			return false;
 		}

@@ -109,6 +109,8 @@
     "feature.targetlock.ClientPacketListenerMixin",
     "feature.targetlock.LevelRendererMixin",
     "feature.targetlock.MultiPlayerGameModeMixin",
+    "feature.touch.HudMixin",
+    "feature.touch.LocalPlayerMixin",
     "feature.ui.AbstractSelectionListAccessor",
     "feature.util.ConnectScreenMixin",
     "feature.virtualmouse.GuiMixin",

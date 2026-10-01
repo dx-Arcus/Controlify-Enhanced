@@ -160,7 +160,7 @@
   "controlify.gui.glyph_editor.touch.buttons": "Buttons",
   "controlify.gui.glyph_editor.touch.size": "Size: %s",
   "controlify.gui.glyph_editor.touch.stick_size.tooltip": "How big the joystick is, from half to twice its usual size. How far you push it for full speed grows with it.",
-  "controlify.gui.glyph_editor.touch.buttons_size.tooltip": "How big the five buttons on the right are, from half to twice their usual size. Chat and pause stay as they are.",
+  "controlify.gui.glyph_editor.touch.buttons_size.tooltip": "How big the buttons on the right are, from half to twice their usual size. Chat and pause stay as they are.",
   "controlify.gui.screen_guide_gui_scale": "Screen Button Guide GUI Scale",
   "controlify.gui.screen_guide_gui_scale.tooltip": "Change the GUI scale of the Screen Button Guide separately from the rest of the game's GUI.",
   "controlify.gui.guide_gui_scale.unchanged": "Unchanged",
@@ -958,7 +958,13 @@
   "controlify.toast.touch.mouse_as_finger": "Mouse as Finger",
   "controlify.toast.touch.show_fingers": "Show Fingers",
   "controlify.gui.dev_functions.touch_controls": "Touch Controls",
-  "controlify.gui.dev_functions.touch_controls.tooltip": "Turns Bedrock's touch controls on: a stick appears under your left thumb anywhere on the left side of the screen, and swiping on the right turns the camera. Push the stick past its rim to sprint. Jump, sprint and sneak are on the right, attack and use below them, and dragging from one of those turns the camera too; chat and pause are at the top; a tap on the hotbar picks a slot, and the slot of three dots after it opens the inventory. While it is on, a tap in a menu still clicks. Press again to turn it off. With Mouse as Finger on as well, the mouse stands in for the thumb, and the cursor is left free so that it can.",
+  "controlify.gui.dev_functions.touch_controls.tooltip": "Turns Bedrock's touch controls on, played as Touch Mode says. In Joystick & Aim Crosshair, a stick appears under your left thumb anywhere on the left side of the screen, and swiping on the right turns the camera. Push the stick past its rim to sprint. Jump, sprint and sneak are on the right, attack and use below them, and dragging from one of those turns the camera too; chat and pause are at the top; a tap on the hotbar picks a slot, and the slot of three dots after it opens the inventory. While it is on, a tap in a menu still clicks. Press again to turn it off. With Mouse as Finger on as well, the mouse stands in for the thumb, and the cursor is left free so that it can.",
+  "controlify.gui.dev_functions.touch_mode": "Touch Mode",
+  "controlify.gui.dev_functions.touch_mode.tooltip": "Switches the touch controls between Bedrock's two joystick modes, and saves the choice. Joystick & Aim Crosshair: attack and use are buttons, and act on what the crosshair is on. Joystick & Tap to Interact: no crosshair; tap a block to use it, tap a mob to attack it, hold on a block to break it, hold with food, a bow, a snowball or anything else you use to use it, and drag anywhere to look around. The joystick moves only when you touch its ring, and jump, sprint and sneak sit a row lower. Servers with an anti-cheat may flag tap mode, as it acts on what is under your finger rather than what you face.",
   "controlify.toast.touch.controls": "Touch Controls",
-  "controlify.toast.touch.controls.refused": "Could not attach the pad - see the log"
+  "controlify.toast.touch.controls.refused": "Could not attach the pad - see the log",
+  "controlify.toast.touch.mode": "Touch Mode",
+  "controlify.touch.mode": "Touch Mode",
+  "controlify.touch.mode.crosshair": "Joystick & Aim Crosshair",
+  "controlify.touch.mode.tap": "Joystick & Tap to Interact"
 }

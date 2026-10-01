@@ -54,6 +54,11 @@ import java.util.Set;
  * <p>The player places the five on the right as one, in the glyph editor's Touch tab (tl117): moved together
  * and sized together, from half to twice their size, growing from their corner ({@link #box(Button, int, int,
  * TouchPad.Layout)}), and kept inside the window ({@link #shift}). Chat and pause stay where they are.
+ *
+ * <p>In tap mode (tl118) attack and use are not there - a tap on the world attacks and uses, as Bedrock's tap mode
+ * has neither ({@link #shown}) - and jump, sprint and sneak each sit a row lower, in the place of the one below them,
+ * so sneak is in the corner (Donny, 1 Oct 15:50: option B; {@link #lower}). Kept clear of the hotbar and inside the
+ * window by those three alone.
  */
 public final class TouchButtons {
 	/** A tapped button stays pressed at least this long, so the controller's tick - twenty a second - sees it. */
@@ -311,21 +316,54 @@ public final class TouchButtons {
 	 * window holds - and chat, pause and the close button stay where they are.
 	 */
 	static Box box(Button button, int width, int height, TouchPad.Layout layout) {
+		return box(button, width, height, layout, TouchMode.CROSSHAIR);
+	}
+
+	/**
+	 * Where a button sits in a window of this many pixels with the player's layout, in this mode: as above, and in
+	 * tap mode, where attack and use are not there, each of the other three of the five sits a row lower, in the
+	 * place of the one below it ({@link #lower}, Donny 1 Oct 15:50: option B) - sneak in the corner.
+	 */
+	static Box box(Button button, int width, int height, TouchPad.Layout layout, TouchMode mode) {
 		boolean group = inGroup(button);
+		Button place = group && mode == TouchMode.TAP ? lower(button) : button;
 		float size = group ? button.size() * layout.buttonSize() : button.size();
 		int unit = Math.max(1, Math.round(size * height / GRID));
 		if (group) {
 			unit = Math.min(unit, Math.max(1, (int) ((height - 1) / GROUP_HEIGHT)));
 		}
 		int side = unit * GRID;
-		int centreX = Math.round(button.fromX() * width + button.offsetX() * unit) + (group ? Math.round(layout.buttonsX() * height) : 0);
-		int centreY = Math.round(button.fromY() * height + button.offsetY() * unit) + (group ? Math.round(layout.buttonsY() * height) : 0);
+		int centreX = Math.round(place.fromX() * width + place.offsetX() * unit) + (group ? Math.round(layout.buttonsX() * height) : 0);
+		int centreY = Math.round(place.fromY() * height + place.offsetY() * unit) + (group ? Math.round(layout.buttonsY() * height) : 0);
 		return new Box(centreX - side / 2, centreY - side / 2, unit);
+	}
+
+	/**
+	 * The one of the five next below a button in its column - jump's is sneak, sneak's is use, sprint's is attack -
+	 * whose place it takes in tap mode (tl118); itself when none is below it.
+	 */
+	static Button lower(Button button) {
+		Button below = button;
+		for (Button other : BUTTONS) {
+			if (inGroup(other) && other.offsetX() == button.offsetX() && other.offsetY() > button.offsetY()
+					&& (below == button || other.offsetY() < below.offsetY())) {
+				below = other;
+			}
+		}
+		return below;
 	}
 
 	/** Whether a button is one of the five hung from the bottom-right corner, which the player moves and sizes together. */
 	static boolean inGroup(Button button) {
 		return button.fromY() == 1f;
+	}
+
+	/**
+	 * Whether a button is there in this mode (tl118): all of them but in tap mode, where a tap on the world uses and
+	 * attacks, so the two that pull the triggers - attack and use - are not, as Bedrock's tap mode has neither.
+	 */
+	static boolean shown(Button button, TouchMode mode) {
+		return mode != TouchMode.TAP || button.axis() < 0;
 	}
 
 	/** See {@link #GROUP_HEIGHT}: from the highest top to the lowest foot of the five, in their units. */
@@ -346,7 +384,7 @@ public final class TouchButtons {
 	 * view's layout, the ones hung from the bottom moved together by {@link #shift}.
 	 */
 	static Box box(Button button, TouchPad.View view) {
-		Box box = box(button, view.width(), view.height(), view.layout());
+		Box box = box(button, view.width(), view.height(), view.layout(), view.mode());
 		if (!inGroup(button)) {
 			return box;
 		}
@@ -365,7 +403,7 @@ public final class TouchButtons {
 	 */
 	static int[] shift(TouchPad.View view) {
 		int up = lift(view);
-		int[] bounds = bounds(view.width(), view.height(), view.layout());
+		int[] bounds = bounds(view.width(), view.height(), view.layout(), view.mode());
 		int left = bounds[0];
 		int top = bounds[1] - up;
 		int right = bounds[2];
@@ -383,15 +421,20 @@ public final class TouchButtons {
 
 	/** Where the layout puts the five, in a window of this many pixels, together: their left, top, right and bottom edges. */
 	static int[] bounds(int width, int height, TouchPad.Layout layout) {
+		return bounds(width, height, layout, TouchMode.CROSSHAIR);
+	}
+
+	/** Where the layout puts those of the five there are in this mode (tl118), together: their left, top, right and bottom edges. */
+	static int[] bounds(int width, int height, TouchPad.Layout layout, TouchMode mode) {
 		int left = Integer.MAX_VALUE;
 		int top = Integer.MAX_VALUE;
 		int right = Integer.MIN_VALUE;
 		int bottom = Integer.MIN_VALUE;
 		for (Button button : BUTTONS) {
-			if (!inGroup(button)) {
+			if (!inGroup(button) || !shown(button, mode)) {
 				continue;
 			}
-			Box box = box(button, width, height, layout);
+			Box box = box(button, width, height, layout, mode);
 			left = Math.min(left, box.x());
 			top = Math.min(top, box.y());
 			right = Math.max(right, box.x() + box.side());
@@ -414,10 +457,10 @@ public final class TouchButtons {
 		int slotTop = (view.guiHeight() - HOTBAR_HEIGHT - 1) * scale;
 		int lift = 0;
 		for (Button button : BUTTONS) {
-			if (!inGroup(button)) {
+			if (!inGroup(button) || !shown(button, view.mode())) {
 				continue;
 			}
-			Box box = box(button, view.width(), view.height(), view.layout());
+			Box box = box(button, view.width(), view.height(), view.layout(), view.mode());
 			int left = box.x();
 			int right = box.x() + box.side();
 			int bottom = box.y() + box.side() + box.unit();
@@ -444,7 +487,7 @@ public final class TouchButtons {
 		float px = finger.x() * view.width();
 		float py = finger.y() * view.height();
 		for (int i = 0; i < BUTTONS.size(); i++) {
-			if (box(BUTTONS.get(i), view).contains(px, py)) {
+			if (shown(BUTTONS.get(i), view.mode()) && box(BUTTONS.get(i), view).contains(px, py)) {
 				CLAIMS.put(key, new Claim(i, finger.x(), finger.y()));
 				PRESSED_AT[i] = view.nanos();
 				return true;
@@ -581,7 +624,7 @@ public final class TouchButtons {
 		pose.scale(1f / view.scale(), 1f / view.scale());
 		for (int i = 0; i < BUTTONS.size(); i++) {
 			Button button = BUTTONS.get(i);
-			if (placedOnly && !inGroup(button)) {
+			if ((placedOnly && !inGroup(button)) || !shown(button, view.mode())) {
 				continue;
 			}
 			Box box = box(button, view);

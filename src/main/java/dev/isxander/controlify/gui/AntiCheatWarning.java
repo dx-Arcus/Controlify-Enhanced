@@ -9,7 +9,10 @@ package dev.isxander.controlify.gui;
 import dev.isxander.controlify.aimassist.AimAssistMode;
 import dev.isxander.controlify.config.settings.AimAssistSettings;
 import dev.isxander.controlify.config.settings.GlobalSettings;
+import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.reacharound.ReachAroundMode;
+import dev.isxander.controlify.touch.TouchInput;
+import dev.isxander.controlify.touch.TouchMode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
@@ -26,15 +29,22 @@ import java.util.List;
  * run on a server at all. Aim Assist set to Everywhere, and with it - since none of them runs on a
  * server without it - the snaps, Swing Timing Assist, Trajectory Aim, Target Players, and Ignore
  * Crosshair Cone while Target Lock is on, helping aim, with an Override switch on. Block Reach Around
- * set to Everywhere, since its other settings keep it off servers. And analog movement forced on
- * every server.
+ * set to Everywhere, since its other settings keep it off servers. Analog movement forced on
+ * every server. And touch controls set to tap to interact (tl118), where the game acts on what is
+ * under a finger rather than what the player faces - which anti-cheats that check where a player
+ * looks can take for cheating - on 26.3, the only version with touch.
  */
 public final class AntiCheatWarning {
 	private AntiCheatWarning() {
 	}
 
-	/** The settings that are on, in the order the line names them, each by its name on its screen. */
+	/** The settings that are on, in the order the line names them, each by its name on its screen - touch's left out. */
 	public static List<Component> risky(AimAssistSettings aim, GlobalSettings global) {
+		return risky(aim, global, null);
+	}
+
+	/** The settings that are on, in the order the line names them, each by its name on its screen. */
+	public static List<Component> risky(AimAssistSettings aim, GlobalSettings global, @Nullable TouchSettings touch) {
 		List<Component> risky = new ArrayList<>();
 		if (aim.mode == AimAssistMode.EVERYWHERE) {
 			risky.add(set("controlify.gui.aim_assist.mode", aim.mode.getDisplayName()));
@@ -65,12 +75,20 @@ public final class AntiCheatWarning {
 		if (global.analogueMovementDefaultEnabled && !global.alwaysKeyboardMovement) {
 			risky.add(Component.translatable("controlify.gui.analogue_movement_default_enabled"));
 		}
+		if (touch != null && TouchInput.SUPPORTED && touch.mode == TouchMode.TAP) {
+			risky.add(set("controlify.touch.mode", touch.mode.getDisplayName()));
+		}
 		return risky;
 	}
 
-	/** The whole line, in red, or null while nothing that counts is on. */
+	/** The whole line, in red, or null while nothing that counts is on - touch's left out. */
 	public static @Nullable Component line(AimAssistSettings aim, GlobalSettings global) {
-		List<Component> risky = risky(aim, global);
+		return line(aim, global, null);
+	}
+
+	/** The whole line, in red, or null while nothing that counts is on. */
+	public static @Nullable Component line(AimAssistSettings aim, GlobalSettings global, @Nullable TouchSettings touch) {
+		List<Component> risky = risky(aim, global, touch);
 		if (risky.isEmpty()) {
 			return null;
 		}

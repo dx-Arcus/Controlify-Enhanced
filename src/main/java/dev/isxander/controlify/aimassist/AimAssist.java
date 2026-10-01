@@ -9,6 +9,7 @@ package dev.isxander.controlify.aimassist;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.config.settings.AimAssistSettings;
 import dev.isxander.controlify.config.settings.TargetLockSettings;
+import dev.isxander.controlify.touch.TouchPad;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
@@ -263,7 +264,8 @@ public final class AimAssist {
 		LocalPlayer player = Minecraft.getInstance().player;
 		MotionAverage.tick();
 
-		if (player == null || settings.mode == AimAssistMode.OFF || !settings.mode.canAimAssist()) {
+		// Tap mode has no crosshair to help onto anything: a finger picks what is acted on there (tl118).
+		if (player == null || settings.mode == AimAssistMode.OFF || !settings.mode.canAimAssist() || TouchPad.tapMode()) {
 			off();
 			return;
 		}
