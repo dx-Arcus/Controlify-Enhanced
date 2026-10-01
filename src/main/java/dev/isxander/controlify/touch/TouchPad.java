@@ -9,6 +9,8 @@ package dev.isxander.controlify.touch;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
+import dev.isxander.controlify.config.ConfigManager;
+import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
 import dev.isxander.controlify.screenop.ScreenProcessor;
@@ -66,10 +68,11 @@ import java.util.Set;
  * only while the cursor is free; the game's grabs are refused for as long as that lasts. On a screen the
  * pad lets go, the screens' controller glyphs are not drawn, and a close button stands in for Esc
  * ({@link #renderScreen}, {@link #closeTapped}, tl116). Switched by the Dev Functions panel's Touch
- * Controls for now; nothing is saved.
+ * Controls for now, and not saved. Where the stick rests and the buttons sit, and how big each is, the
+ * player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117).
  */
 public final class TouchPad {
-	/** How far from the left edge, as a fraction of the window's width, a finger landing becomes the stick. */
+	/** How far from the left edge, as a fraction of the window's width, a finger landing becomes the stick - as does one landing on its ring where it rests ({@link #onRest}). */
 	static final float STICK_ZONE = 0.45f;
 
 	/** The stick's reach - full deflection - as a fraction of the window's height. */
@@ -81,7 +84,7 @@ public final class TouchPad {
 	/** A swipe across the whole window turns the camera this far, in degrees (180 in tl111: too slow). */
 	static final float LOOK_DEGREES_PER_WIDTH = 360f;
 
-	/** Where the stick rests until a finger lands in its zone: this many window heights in from the left and up from the bottom. */
+	/** Where the stick rests until a finger lands in its zone: this many window heights in from the left and up from the bottom, at its default size. */
 	static final float REST_FROM_CORNER = 0.17f;
 
 	/** {@code Entity.turn} turns 0.15 degrees per unit it is handed. */
@@ -156,13 +159,38 @@ public final class TouchPad {
 	}
 
 	/**
+	 * Where the player put the touch controls and how big they made them (tl117, the glyph editor's Touch
+	 * tab): the stick's resting place and the five action buttons, each moved by a fraction of the window's
+	 * height - right and down positive - and each sized by a fraction of its default size.
+	 */
+	public record Layout(float stickX, float stickY, float stickSize, float buttonsX, float buttonsY, float buttonSize) {
+		/** Nothing moved, nothing resized: exactly where tl115 put everything. */
+		public static final Layout DEFAULT = new Layout(0f, 0f, 1f, 0f, 0f, 1f);
+
+		public static Layout of(TouchSettings settings) {
+			return new Layout(settings.stickOffsetX, settings.stickOffsetY, TouchSettings.size(settings.stickSize),
+					settings.buttonsOffsetX, settings.buttonsOffsetY, TouchSettings.size(settings.buttonSize));
+		}
+	}
+
+	/**
 	 * The window a frame of fingers is read against: its size in pixels and in GUI pixels, the GUI scale,
 	 * whether the hotbar is there to tap (no spectators), where the inventory slot after it is, whether the
-	 * player is flying (jump and sneak show up and down), and the time.
+	 * player is flying (jump and sneak show up and down), the time, and the player's layout.
 	 */
-	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos) {
+	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout) {
+		/** The same window with the default layout. */
+		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos) {
+			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, Layout.DEFAULT);
+		}
+
 		float aspect() {
 			return (float) width / height;
+		}
+
+		/** The stick's reach - and its ring's radius - as a fraction of the window's height. */
+		float stickRadius() {
+			return STICK_RADIUS * layout.stickSize();
 		}
 	}
 
@@ -294,6 +322,11 @@ public final class TouchPad {
 
 	/** The window as it is now; see {@link View}. */
 	private static View view(Minecraft minecraft) {
+		return view(minecraft, layout());
+	}
+
+	/** The window as it is now, with this layout. */
+	private static View view(Minecraft minecraft, Layout layout) {
 		Window window = minecraft.getWindow();
 		LocalPlayer player = minecraft.player;
 		boolean hotbar = player != null && !player.isSpectator();
@@ -304,7 +337,13 @@ public final class TouchPad {
 		boolean flying = player != null && player.getAbilities().flying;
 		int guiWidth = window.getGuiScaledWidth();
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime());
+				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout);
+	}
+
+	/** The layout the player saved, or the default before there is a config to read it from. */
+	static Layout layout() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? Layout.DEFAULT : Layout.of(config.getSettings().touchSettings());
 	}
 
 	/** While a screen is up: the fingers down now are nobody's until they lift. */
@@ -367,7 +406,7 @@ public final class TouchPad {
 			if (!seen.contains(key) && TouchButtons.claim(finger, view)) {
 				continue;
 			}
-			if (stick == null && finger.x() < STICK_ZONE) {
+			if (stick == null && (finger.x() < STICK_ZONE || onRest(finger, view))) {
 				stickFinger = key;
 				anchorX = finger.x();
 				anchorY = finger.y();
@@ -385,8 +424,8 @@ public final class TouchPad {
 			writeStick(0f, 0f, false);
 		} else {
 			// In units of the window's height either way, so the stick is round on screen.
-			float dx = (stick.x() - anchorX) * aspect / STICK_RADIUS;
-			float dy = (stick.y() - anchorY) / STICK_RADIUS;
+			float dx = (stick.x() - anchorX) * aspect / view.stickRadius();
+			float dy = (stick.y() - anchorY) / view.stickRadius();
 			float reach = (float) Math.sqrt(dx * dx + dy * dy);
 			if (reach > 1f) {
 				dx /= reach;
@@ -408,6 +447,18 @@ public final class TouchPad {
 		lookX = look.x();
 		lookY = look.y();
 		return turn;
+	}
+
+	/**
+	 * Whether a finger landed on the stick's ring where it rests: that is the stick too, wherever the player put
+	 * it, past its zone as well (tl117).
+	 */
+	static boolean onRest(TouchInput.Finger finger, View view) {
+		int radius = Math.round(view.stickRadius() * view.guiHeight());
+		int[] rest = rest(view, view.guiWidth(), view.guiHeight(), radius);
+		float dx = finger.x() * view.guiWidth() - rest[0];
+		float dy = finger.y() * view.guiHeight() - rest[1];
+		return dx * dx + dy * dy <= (float) radius * radius;
 	}
 
 	/** A finger's movement, as fractions of the window, as a turn: pitch scaled by the aspect so a centimetre turns the same either way. */
@@ -535,11 +586,62 @@ public final class TouchPad {
 		return true;
 	}
 
+	/**
+	 * The touch controls this layout places, for the glyph editor's Touch tab (tl117): the stick and the five
+	 * buttons exactly where the game would draw them in the world now - kept clear of the hotbar as there, though
+	 * the editor does not show it - at rest, as on a screen the pad has let go of every finger. Chat and pause are
+	 * left out, as the tab does not move them and they would sit under its tab bar, and so is the slot of three dots.
+	 */
+	public static void drawPreview(GuiGraphicsExtractor graphics, Layout layout) {
+		drawPreview(graphics, view(Minecraft.getInstance(), layout));
+	}
+
+	/**
+	 * This layout with its offsets kept to what holds the stick's ring and the five buttons inside this window, for
+	 * the glyph editor (tl117): its arrows and boxes stop at the edges rather than count on past them. The sizes are
+	 * left as they are, and the hotbar is not measured; drawn, the controls are kept inside the window whatever the
+	 * offsets ({@link #rest}, {@link TouchButtons#shift}).
+	 */
+	public static Layout keptInside(Layout layout) {
+		Window window = Minecraft.getInstance().getWindow();
+		return keptInside(layout, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(), window.getGuiScaledHeight());
+	}
+
+	/** {@link #keptInside(Layout)}, against a given window - for tests. */
+	static Layout keptInside(Layout layout, int width, int height, int guiWidth, int guiHeight) {
+		float gui = guiHeight;
+		int radius = Math.round(STICK_RADIUS * layout.stickSize() * guiHeight);
+		int fromCorner = Math.round(REST_FROM_CORNER * layout.stickSize() * guiHeight);
+		float stickX = within(layout.stickX(), (radius - fromCorner) / gui, (guiWidth - radius - 1 - fromCorner) / gui);
+		float stickY = within(layout.stickY(), (radius - guiHeight + fromCorner) / gui, (fromCorner - radius - 1) / gui);
+		int[] unmoved = TouchButtons.bounds(width, height, new Layout(0f, 0f, 1f, 0f, 0f, layout.buttonSize()));
+		float buttonsX = within(layout.buttonsX(), -unmoved[0] / (float) height, (width - unmoved[2]) / (float) height);
+		float buttonsY = within(layout.buttonsY(), -unmoved[1] / (float) height, (height - unmoved[3]) / (float) height);
+		return new Layout(stickX, stickY, layout.stickSize(), buttonsX, buttonsY, layout.buttonSize());
+	}
+
+	/** A value no lower than one end and no higher than the other; the low end wins were they ever crossed. */
+	private static float within(float value, float low, float high) {
+		return Math.max(low, Math.min(value, high));
+	}
+
+	/** {@link #drawPreview(GuiGraphicsExtractor, Layout)}, against a given window - for tests. */
+	static void drawPreview(GuiGraphicsExtractor graphics, View view) {
+		drawStick(graphics, view);
+		TouchButtons.render(graphics, view, true);
+	}
+
 	/** {@link #render}, against a given window - for tests. */
 	static void draw(GuiGraphicsExtractor graphics, View view) {
+		drawStick(graphics, view);
+		TouchButtons.render(graphics, view, false);
+	}
+
+	/** The stick's ring, where it rests or where the thumb landed, and its knob. */
+	private static void drawStick(GuiGraphicsExtractor graphics, View view) {
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
-		int radius = Math.round(STICK_RADIUS * height);
+		int radius = Math.round(view.stickRadius() * height);
 		boolean held = stickFinger != null;
 		int[] rest = held ? null : rest(view, width, height, radius);
 		int centreX = held ? Math.round(anchorX * width) : rest[0];
@@ -548,27 +650,34 @@ public final class TouchPad {
 		int knobX = centreX + Math.round(stickX * radius);
 		int knobY = centreY + Math.round(stickY * radius);
 		disc(graphics, knobX, knobY, Math.max(2, Math.round(radius * 0.35f)), sprinting ? KNOB_SPRINT : KNOB);
-		TouchButtons.render(graphics, view);
 	}
 
 	/**
-	 * Where the stick's ring rests, in GUI pixels: {@link #REST_FROM_CORNER} in from the bottom-left corner - moved
-	 * left, or if it cannot go far enough, up, just clear of the hotbar and what the game stacks over it wherever the
-	 * ring would reach over them (a narrow window at a large GUI scale).
+	 * Where the stick's ring rests, in GUI pixels: {@link #REST_FROM_CORNER} in from the bottom-left corner, times
+	 * the stick's size so it grows from that corner as the buttons grow from theirs, then moved by the player's
+	 * offsets (tl117) - and moved left, or if it cannot go far enough or is right of the middle, up, just clear of
+	 * the hotbar and what the game stacks over it wherever the ring would reach over them (a narrow window at a large
+	 * GUI scale); last, kept inside the window, however the player moved and sized it (tl117), the edges of its own
+	 * corner winning were it ever too big. At its default place and size it is inside already.
 	 */
 	static int[] rest(View view, int width, int height, int radius) {
-		int x = Math.round(REST_FROM_CORNER * height);
-		int y = height - Math.round(REST_FROM_CORNER * height);
+		int fromCorner = Math.round(REST_FROM_CORNER * view.layout().stickSize() * height);
+		int x = fromCorner + Math.round(view.layout().stickX() * height);
+		int y = height - fromCorner + Math.round(view.layout().stickY() * height);
 		int hotbarLeft = width / 2 - TouchButtons.HOTBAR_HALF_WIDTH;
+		int hotbarRight = width / 2 + TouchButtons.HOTBAR_HALF_WIDTH;
 		int stackTop = height - TouchButtons.HUD_STACK_HEIGHT;
-		if (view.hotbar() && x + radius + 2 > hotbarLeft && y + radius + 2 > stackTop) {
+		if (view.hotbar() && x + radius + 2 > hotbarLeft && x - radius - 2 < hotbarRight && y + radius + 2 > stackTop) {
 			int left = hotbarLeft - radius - 2;
-			if (left - radius >= 1) {
+			if (x <= width / 2 && left - radius >= 1) {
 				x = left;
 			} else {
 				y = stackTop - radius - 2;
 			}
 		}
+		// The ring is drawn from radius left of its centre to radius right of it, and as far up and down.
+		x = Math.max(radius, Math.min(x, width - radius - 1));
+		y = Math.min(height - radius - 1, Math.max(y, radius));
 		return new int[] {x, y};
 	}
 

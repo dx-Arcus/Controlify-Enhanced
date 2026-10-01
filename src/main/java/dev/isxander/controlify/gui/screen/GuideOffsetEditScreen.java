@@ -11,28 +11,52 @@ import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.bind.InputBinding;
 import dev.isxander.controlify.api.bind.InputBindingSupplier;
 import dev.isxander.controlify.bindings.ControlifyBindings;
+import dev.isxander.controlify.config.dto.TouchConfig;
+import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.config.settings.profile.GenericControllerSettings;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.gui.guide.GuideRenderer;
 import dev.isxander.controlify.gui.guide.PrecomputedLines;
+import dev.isxander.controlify.touch.TouchInput;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.tabs.GridLayoutTab;
+//? if >=26.2 {
+import net.minecraft.client.gui.components.tabs.MenuTabBar;
+//?}
+import net.minecraft.client.gui.components.tabs.TabManager;
+import net.minecraft.client.gui.components.tabs.TabNavigationBar;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Lets the player nudge the left/right ingame button guide columns independently, with a
  * live preview rendered using the player's actual bound inputs (real glyph icons and names
  * for a representative set of bindings), at the exact position the real HUD overlay would use.
  * The controls are {@link OffsetEditorScreen}'s; this lays them out, two clusters side by side.
+ * <p>
+ * Where touch controls exist (26.3), a second tab does the same for them (tl117): the stick's resting
+ * place and the five action buttons, moved with the same controls, a slider each for their size where the
+ * guides have their corner snaps, and the touch controls drawn where they would be. The touch layout is
+ * saved for every controller ({@link TouchSettings}); the guides, as before, for the one being edited.
  */
 public class GuideOffsetEditScreen extends OffsetEditorScreen {
+	private static final String KEY = "controlify.gui.glyph_editor";
+
 	// The real overlay only ever shows a couple of contextually-relevant lines at once, so its
 	// tight betweenLines gap never gets stressed. Here every sample binding is shown together,
 	// and glyph icons commonly render taller than plain text, so give lines extra breathing
@@ -46,6 +70,15 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	private static final int LABEL_HEIGHT = 14;
 	/** Horizontal gap between the two clusters, centred on the screen. */
 	private static final int CLUSTER_GAP = 40;
+
+	/** The tab bar's height (MenuTabBar's), and where the subtitle and the clusters go under it. */
+	private static final int TAB_BAR_HEIGHT = 24;
+	private static final int TABBED_SUBTITLE_Y = TAB_BAR_HEIGHT + 4;
+	private static final int TABBED_CLUSTER_TOP = TABBED_SUBTITLE_Y + 12;
+
+	/** A size slider is as wide as its cluster, up to this. */
+	private static final int SIZE_SLIDER_MAX_WIDTH = 150;
+	private static final int SIZE_SLIDER_HEIGHT = 20;
 
 	// Mirrors the private layout constants in GuideRenderer#extractLines, so the corner-snap
 	// math below lands on exactly the same pixel the real HUD overlay would use.
@@ -66,6 +99,10 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 			ControlifyBindings.USE
 	);
 
+	/** The tabs, by index in the bar. */
+	private static final int GUIDES = 0;
+	private static final int TOUCH = 1;
+
 	private final Screen parent;
 	private final GenericControllerSettings.GuideSettings guideSettings;
 	private final ControllerEntity controller;
@@ -81,8 +118,33 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	private EditBox rightXBox;
 	private EditBox rightYBox;
 
+	/** Whether there are touch controls to place, and so a Touch tab: 26.3 only. */
+	private final boolean tabs = TouchInput.SUPPORTED;
+	private final @Nullable TouchSettings touchSettings;
+
+	// The touch layout being edited: offsets as fractions of the window's height, right and down
+	// positive, as saved; sizes as fractions of the default.
+	private float stickX;
+	private float stickY;
+	private float stickSize;
+	private float buttonsX;
+	private float buttonsY;
+	private float buttonSize;
+
+	private @Nullable EditBox stickXBox;
+	private @Nullable EditBox stickYBox;
+	private @Nullable EditBox buttonsXBox;
+	private @Nullable EditBox buttonsYBox;
+	private @Nullable SizeSlider stickSlider;
+	private @Nullable SizeSlider buttonSlider;
+
+	/** The tab showing; kept when the screen is resized, which builds everything again. */
+	private int page;
+	/** The tab whose controls are being built, or null while they go straight onto the screen. */
+	private @Nullable Page building;
+
 	public GuideOffsetEditScreen(Screen parent, GenericControllerSettings.GuideSettings guideSettings, ControllerEntity controller) {
-		super(Component.translatable("controlify.gui.glyph_editor.title"), "controlify.gui.glyph_editor");
+		super(Component.translatable(KEY + ".title"), KEY);
 		this.parent = parent;
 		this.guideSettings = guideSettings;
 		this.controller = controller;
@@ -91,10 +153,22 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		this.leftOffsetY = guideSettings.ingameGuideOffsetLeftY;
 		this.rightOffsetX = guideSettings.ingameGuideOffsetRightX;
 		this.rightOffsetY = guideSettings.ingameGuideOffsetRightY;
+
+		this.touchSettings = tabs ? Controlify.instance().config().getSettings().touchSettings() : null;
+		if (touchSettings != null) {
+			this.stickX = touchSettings.stickOffsetX;
+			this.stickY = touchSettings.stickOffsetY;
+			this.stickSize = TouchSettings.size(touchSettings.stickSize);
+			this.buttonsX = touchSettings.buttonsOffsetX;
+			this.buttonsY = touchSettings.buttonsOffsetY;
+			this.buttonSize = TouchSettings.size(touchSettings.buttonSize);
+		}
+		// Playing by touch, the player has come for the touch controls.
+		this.page = tabs && TouchPad.active() ? TOUCH : GUIDES;
 	}
 
-	/** Where one side's controls sit, left to right across its cluster. */
-	private record Cluster(int gridX, int rowX, int cornerX, int xStepX, int yStepX) {
+	/** Where one side's controls sit, left to right across its cluster, and the cluster itself. */
+	private record Cluster(int x, int width, int gridX, int rowX, int cornerX, int xStepX, int yStepX) {
 	}
 
 	/**
@@ -125,6 +199,10 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		int clusterHeight = LABEL_HEIGHT + gridSize + 10 + rowHeight + 10 + cornerGridHeight;
 
 		int clusterTop = height / 2 - clusterHeight / 2;
+		if (tabs) {
+			// Clear of the tab bar and the subtitle under it.
+			clusterTop = Math.max(clusterTop, TABBED_CLUSTER_TOP);
+		}
 		int gridY = clusterTop + LABEL_HEIGHT;
 		int leftClusterX = width / 2 - CLUSTER_GAP / 2 - clusterWidth;
 		int rightClusterX = width / 2 + CLUSTER_GAP / 2;
@@ -154,6 +232,8 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 				: xStepX + STEP_BLOCK_WIDTH + STEP_BLOCK_STACKED_GAP;
 
 		return new Cluster(
+				x,
+				clusterWidth,
 				x + (clusterWidth - gridSize) / 2,
 				rowX,
 				x + (clusterWidth - CORNER_GRID_WIDTH) / 2,
@@ -162,9 +242,80 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		);
 	}
 
+	/**
+	 * A tab of the editor: its controls, placed by the screen rather than by a layout. The bar shows and
+	 * hides them together; {@link #doLayout} leaves them where they are.
+	 */
+	private static final class Page extends GridLayoutTab {
+		private final List<AbstractWidget> widgets = new ArrayList<>();
+
+		Page(Component title) {
+			super(title);
+		}
+
+		@Override
+		public void visitChildren(Consumer<AbstractWidget> consumer) {
+			widgets.forEach(consumer);
+		}
+
+		@Override
+		public void doLayout(ScreenRectangle rectangle) {
+		}
+	}
+
+	@Override
+	protected <T extends AbstractWidget> T addControl(T widget) {
+		if (building != null) {
+			building.widgets.add(widget);
+			return widget;
+		}
+		return super.addControl(widget);
+	}
+
 	@Override
 	protected void init() {
 		clearStepButtons();
+		if (!tabs) {
+			addGuideControls();
+		} else {
+			Page guides = new Page(Component.translatable(KEY + ".tab.guides"));
+			Page touch = new Page(Component.translatable(KEY + ".tab.touch"));
+			building = guides;
+			addGuideControls();
+			building = touch;
+			addTouchControls();
+			building = null;
+
+			TabManager tabManager = new TabManager(this::addRenderableWidget, this::removeWidget,
+					tab -> page = tab == touch ? TOUCH : GUIDES, tab -> {});
+			TabNavigationBar bar = tabBar(tabManager, guides, touch);
+			addRenderableWidget(bar);
+			bar.selectTab(page, false);
+		}
+
+		int footerY = height - 28;
+		addRenderableWidget(Button.builder(Component.translatable(KEY + ".reset_all"), b -> resetAll())
+				.bounds(width / 2 - FOOTER_BUTTON_WIDTH - 4, footerY, FOOTER_BUTTON_WIDTH, 20)
+				.build());
+		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> commitAndClose())
+				.bounds(width / 2 + 4, footerY, FOOTER_BUTTON_WIDTH, 20)
+				.build());
+	}
+
+	/** The bar across the top, Guides and Touch: the game's own menu tab bar, which a controller's bumpers step through. */
+	private TabNavigationBar tabBar(TabManager tabManager, Page guides, Page touch) {
+		//? if >=26.2 {
+		TabNavigationBar bar = MenuTabBar.builder(tabManager, width).addTabs(guides, touch).build();
+		bar.arrangeElements(width);
+		//?} else {
+		/*TabNavigationBar bar = TabNavigationBar.builder(tabManager, width).addTabs(guides, touch).build();
+		bar.arrangeElements();
+		*///?}
+		return bar;
+	}
+
+	/** The guides' two clusters: a directional pad, the offset boxes with their jumps, and the corner snaps each. */
+	private void addGuideControls() {
 		ClusterLayout layout = clusterLayout();
 
 		Cluster left = layout.left();
@@ -175,14 +326,14 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 				() -> leftOffsetY -= STEP, () -> leftOffsetY += STEP,
 				() -> leftOffsetX -= STEP, () -> leftOffsetX += STEP,
 				() -> { leftOffsetX = 0; leftOffsetY = 0; },
-				"controlify.gui.glyph_editor.reset_side"
+				KEY + ".reset_side"
 		);
 		addDirectionalPad(
 				right.gridX(), layout.gridY(),
 				() -> rightOffsetY -= STEP, () -> rightOffsetY += STEP,
 				() -> rightOffsetX -= STEP, () -> rightOffsetX += STEP,
 				() -> { rightOffsetX = 0; rightOffsetY = 0; },
-				"controlify.gui.glyph_editor.reset_side"
+				KEY + ".reset_side"
 		);
 
 		int rowY = layout.rowY();
@@ -195,10 +346,10 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		rightXBox = createOffsetBox(rightRowX, rowY, rightOffsetX, v -> rightOffsetX = v);
 		rightYBox = createOffsetBox(rightRowX + OFFSET_BOX_WIDTH + OFFSET_BOX_GAP, rowY,
 				shownY(true, rightOffsetY), v -> rightOffsetY = offsetFromShownY(true, v));
-		addRenderableWidget(leftXBox);
-		addRenderableWidget(leftYBox);
-		addRenderableWidget(rightXBox);
-		addRenderableWidget(rightYBox);
+		addControl(leftXBox);
+		addControl(leftYBox);
+		addControl(rightXBox);
+		addControl(rightYBox);
 
 		int stepY = layout.stepY();
 		addStepButtons(left.xStepX(), stepY, d -> leftOffsetX += d);
@@ -210,14 +361,118 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 
 		addCornerButtons(left.cornerX(), layout.cornerY(), (top, rightEdge) -> snapToCorner(false, top, rightEdge));
 		addCornerButtons(right.cornerX(), layout.cornerY(), (top, rightEdge) -> snapToCorner(true, top, rightEdge));
+	}
 
-		int footerY = height - 28;
-		addRenderableWidget(Button.builder(Component.translatable("controlify.gui.glyph_editor.reset_all"), b -> resetAll())
-				.bounds(width / 2 - FOOTER_BUTTON_WIDTH - 4, footerY, FOOTER_BUTTON_WIDTH, 20)
-				.build());
-		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> commitAndClose())
-				.bounds(width / 2 + 4, footerY, FOOTER_BUTTON_WIDTH, 20)
-				.build());
+	/**
+	 * The touch controls' two clusters (tl117), the stick's on the left and the buttons' on the right, laid
+	 * out as the guides' are: a directional pad, the offset boxes with their jumps - in GUI pixels from
+	 * where each sits by default, X right and Y up, and stopping at the window's edges - and in the corner
+	 * snaps' place a size slider.
+	 */
+	private void addTouchControls() {
+		ClusterLayout layout = clusterLayout();
+		Cluster left = layout.left();
+		Cluster right = layout.right();
+
+		addDirectionalPad(
+				left.gridX(), layout.gridY(),
+				() -> moved(() -> stickY -= pixels(STEP)), () -> moved(() -> stickY += pixels(STEP)),
+				() -> moved(() -> stickX -= pixels(STEP)), () -> moved(() -> stickX += pixels(STEP)),
+				() -> { stickX = 0f; stickY = 0f; },
+				KEY + ".reset_side"
+		);
+		addDirectionalPad(
+				right.gridX(), layout.gridY(),
+				() -> moved(() -> buttonsY -= pixels(STEP)), () -> moved(() -> buttonsY += pixels(STEP)),
+				() -> moved(() -> buttonsX -= pixels(STEP)), () -> moved(() -> buttonsX += pixels(STEP)),
+				() -> { buttonsX = 0f; buttonsY = 0f; },
+				KEY + ".reset_side"
+		);
+
+		int rowY = layout.rowY();
+		// Y as typed counts up, the layout down: negated as a whole number, so a 0 is never the float -0, which the
+		// file would keep as if it were moved.
+		stickXBox = createOffsetBox(left.rowX(), rowY, shown(stickX), v -> moved(() -> stickX = pixels(v)));
+		stickYBox = createOffsetBox(left.rowX() + OFFSET_BOX_WIDTH + OFFSET_BOX_GAP, rowY, -shown(stickY), v -> moved(() -> stickY = pixels(-v)));
+		buttonsXBox = createOffsetBox(right.rowX(), rowY, shown(buttonsX), v -> moved(() -> buttonsX = pixels(v)));
+		buttonsYBox = createOffsetBox(right.rowX() + OFFSET_BOX_WIDTH + OFFSET_BOX_GAP, rowY, -shown(buttonsY), v -> moved(() -> buttonsY = pixels(-v)));
+		addControl(stickXBox);
+		addControl(stickYBox);
+		addControl(buttonsXBox);
+		addControl(buttonsYBox);
+
+		int stepY = layout.stepY();
+		addStepButtons(left.xStepX(), stepY, d -> moved(() -> stickX += pixels(d)));
+		addStepButtons(right.xStepX(), stepY, d -> moved(() -> buttonsX += pixels(d)));
+		// Negated as the guides' are: the Y box counts upwards.
+		addStepButtons(left.yStepX(), stepY, d -> moved(() -> stickY -= pixels(d)));
+		addStepButtons(right.yStepX(), stepY, d -> moved(() -> buttonsY -= pixels(d)));
+
+		stickSlider = addControl(sizeSlider(left, layout.cornerY(), stickSize, size -> stickSize = size, KEY + ".touch.stick_size.tooltip"));
+		buttonSlider = addControl(sizeSlider(right, layout.cornerY(), buttonSize, size -> buttonSize = size, KEY + ".touch.buttons_size.tooltip"));
+	}
+
+	/** A move of the touch controls: made, then held to what keeps them inside the window. */
+	private void moved(Runnable move) {
+		move.run();
+		TouchPad.Layout kept = TouchPad.keptInside(touchLayout());
+		stickX = kept.stickX();
+		stickY = kept.stickY();
+		buttonsX = kept.buttonsX();
+		buttonsY = kept.buttonsY();
+	}
+
+	private SizeSlider sizeSlider(Cluster cluster, int y, float size, Consumer<Float> onChange, String tooltipKey) {
+		int sliderWidth = Math.min(cluster.width(), SIZE_SLIDER_MAX_WIDTH);
+		return new SizeSlider(cluster.x() + (cluster.width() - sliderWidth) / 2, y, sliderWidth, size, onChange,
+				Component.translatable(tooltipKey));
+	}
+
+	/** So many GUI pixels as a fraction of the window's height, which is how the touch layout is kept. */
+	private float pixels(int guiPixels) {
+		return guiPixels / (float) height;
+	}
+
+	/** A fraction of the window's height in whole GUI pixels, for the boxes. */
+	private int shown(float fraction) {
+		return Math.round(fraction * height);
+	}
+
+	/** A size from half to twice the default, a twentieth at a time, its percentage on the slider. */
+	private static final class SizeSlider extends AbstractSliderButton {
+		private final Consumer<Float> onChange;
+
+		SizeSlider(int x, int y, int width, float size, Consumer<Float> onChange, Component tooltip) {
+			super(x, y, width, SIZE_SLIDER_HEIGHT, Component.empty(), toValue(size));
+			this.onChange = onChange;
+			setTooltip(Tooltip.create(tooltip));
+			updateMessage();
+		}
+
+		private static double toValue(float size) {
+			return (size - TouchConfig.MIN_SIZE) / (TouchConfig.MAX_SIZE - TouchConfig.MIN_SIZE);
+		}
+
+		float size() {
+			float size = (float) (TouchConfig.MIN_SIZE + value * (TouchConfig.MAX_SIZE - TouchConfig.MIN_SIZE));
+			return Math.round(size * 20f) / 20f;
+		}
+
+		/** Puts the slider at a size without reporting it, for Reset All. */
+		void set(float size) {
+			this.value = toValue(size);
+			updateMessage();
+		}
+
+		@Override
+		protected void updateMessage() {
+			setMessage(Component.translatable(KEY + ".touch.size", Math.round(size() * 100f) + "%"));
+		}
+
+		@Override
+		protected void applyValue() {
+			onChange.accept(size());
+		}
 	}
 
 	/**
@@ -294,13 +549,33 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		leftYBox.setValue(String.valueOf(shownY(false, leftOffsetY)));
 		rightXBox.setValue(String.valueOf(rightOffsetX));
 		rightYBox.setValue(String.valueOf(shownY(true, rightOffsetY)));
+		if (stickXBox != null && stickYBox != null && buttonsXBox != null && buttonsYBox != null) {
+			stickXBox.setValue(String.valueOf(shown(stickX)));
+			stickYBox.setValue(String.valueOf(-shown(stickY)));
+			buttonsXBox.setValue(String.valueOf(shown(buttonsX)));
+			buttonsYBox.setValue(String.valueOf(-shown(buttonsY)));
+		}
 	}
 
+	/** Puts back what the tab showing edits: the guides' offsets, or the touch controls' places and sizes. */
 	private void resetAll() {
-		leftOffsetX = 0;
-		leftOffsetY = 0;
-		rightOffsetX = 0;
-		rightOffsetY = 0;
+		if (page == TOUCH) {
+			stickX = 0f;
+			stickY = 0f;
+			stickSize = 1f;
+			buttonsX = 0f;
+			buttonsY = 0f;
+			buttonSize = 1f;
+			if (stickSlider != null && buttonSlider != null) {
+				stickSlider.set(stickSize);
+				buttonSlider.set(buttonSize);
+			}
+		} else {
+			leftOffsetX = 0;
+			leftOffsetY = 0;
+			rightOffsetX = 0;
+			rightOffsetY = 0;
+		}
 		syncEditBoxes();
 	}
 
@@ -309,6 +584,14 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		guideSettings.ingameGuideOffsetLeftY = leftOffsetY;
 		guideSettings.ingameGuideOffsetRightX = rightOffsetX;
 		guideSettings.ingameGuideOffsetRightY = rightOffsetY;
+		if (touchSettings != null) {
+			touchSettings.stickOffsetX = stickX;
+			touchSettings.stickOffsetY = stickY;
+			touchSettings.stickSize = stickSize;
+			touchSettings.buttonsOffsetX = buttonsX;
+			touchSettings.buttonsOffsetY = buttonsY;
+			touchSettings.buttonSize = buttonSize;
+		}
 		Controlify.instance().config().saveSafely();
 		MinecraftUtil.setScreen(parent);
 	}
@@ -318,18 +601,34 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		commitAndClose();
 	}
 
+	/** The touch layout as it stands in the editor. */
+	private TouchPad.Layout touchLayout() {
+		return new TouchPad.Layout(stickX, stickY, stickSize, buttonsX, buttonsY, buttonSize);
+	}
+
 	@Override
 	public void extractRenderState(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
+		boolean touch = tabs && page == TOUCH;
+		if (touch) {
+			// Under the controls: the touch controls as the game would draw them, moved and sized as set here.
+			TouchPad.drawPreview(graphics, touchLayout());
+		}
+
 		super.extractRenderState(graphics, mouseX, mouseY, a);
 
-		graphics.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
-		graphics.centeredText(font, Component.translatable("controlify.gui.glyph_editor.subtitle"), width / 2, 24, 0xFFA0A0A0);
+		int subtitleY = 24;
+		if (tabs) {
+			subtitleY = TABBED_SUBTITLE_Y;
+		} else {
+			graphics.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
+		}
+		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.subtitle" : KEY + ".subtitle"), width / 2, subtitleY, 0xFFA0A0A0);
 
 		ClusterLayout layout = clusterLayout();
 		int gridSize = layout.gridSize();
 
-		graphics.centeredText(font, Component.translatable("controlify.gui.glyph_editor.left_side"), layout.left().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
-		graphics.centeredText(font, Component.translatable("controlify.gui.glyph_editor.right_side"), layout.right().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
+		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.stick" : KEY + ".left_side"), layout.left().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
+		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.buttons" : KEY + ".right_side"), layout.right().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
 
 		int rowY = layout.rowY();
 		int leftRowX = layout.left().rowX();
@@ -339,6 +638,10 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		graphics.centeredText(font, Component.literal("Y"), leftRowX + OFFSET_BOX_WIDTH + OFFSET_BOX_GAP + OFFSET_BOX_WIDTH / 2, rowY - 10, 0xFFAAAAAA);
 		graphics.centeredText(font, Component.literal("X"), rightRowX + OFFSET_BOX_WIDTH / 2, rowY - 10, 0xFFAAAAAA);
 		graphics.centeredText(font, Component.literal("Y"), rightRowX + OFFSET_BOX_WIDTH + OFFSET_BOX_GAP + OFFSET_BOX_WIDTH / 2, rowY - 10, 0xFFAAAAAA);
+
+		if (touch) {
+			return;
+		}
 
 		// live preview using the player's real bound inputs, rendered with the exact same
 		// positioning math the real HUD overlay uses

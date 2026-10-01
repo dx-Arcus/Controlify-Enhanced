@@ -7,6 +7,7 @@
 package dev.isxander.controlify.gui.screen;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -90,6 +91,14 @@ abstract class OffsetEditorScreen extends Screen {
 		super.setFocused(focused);
 	}
 
+	/**
+	 * Adds one of the shared controls to the screen. A screen that shows its controls a tab at a time takes
+	 * them for the tab being built instead ({@link GuideOffsetEditScreen}, tl117).
+	 */
+	protected <T extends AbstractWidget> T addControl(T widget) {
+		return addRenderableWidget(widget);
+	}
+
 	/** Forgets the jump buttons of the last layout; the first thing {@code init} does. */
 	protected void clearStepButtons() {
 		stepButtons.clear();
@@ -107,20 +116,20 @@ abstract class OffsetEditorScreen extends Screen {
 	protected void addDirectionalPad(int gridX, int gridY, Runnable onUp, Runnable onDown, Runnable onLeft, Runnable onRight,
 			Runnable onReset, String resetTooltipKey) {
 		int s = BUTTON_SIZE;
-		addRenderableWidget(Button.builder(Component.literal("▲"), b -> { onUp.run(); syncEditBoxes(); })
+		addControl(Button.builder(Component.literal("▲"), b -> { onUp.run(); syncEditBoxes(); })
 				.bounds(gridX + s, gridY, s, s)
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("◄"), b -> { onLeft.run(); syncEditBoxes(); })
+		addControl(Button.builder(Component.literal("◄"), b -> { onLeft.run(); syncEditBoxes(); })
 				.bounds(gridX, gridY + s, s, s)
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("⟲"), b -> { onReset.run(); syncEditBoxes(); })
+		addControl(Button.builder(Component.literal("⟲"), b -> { onReset.run(); syncEditBoxes(); })
 				.bounds(gridX + s, gridY + s, s, s)
 				.tooltip(Tooltip.create(Component.translatable(resetTooltipKey)))
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("►"), b -> { onRight.run(); syncEditBoxes(); })
+		addControl(Button.builder(Component.literal("►"), b -> { onRight.run(); syncEditBoxes(); })
 				.bounds(gridX + s * 2, gridY + s, s, s)
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("▼"), b -> { onDown.run(); syncEditBoxes(); })
+		addControl(Button.builder(Component.literal("▼"), b -> { onDown.run(); syncEditBoxes(); })
 				.bounds(gridX + s, gridY + s * 2, s, s)
 				.build());
 	}
@@ -142,7 +151,7 @@ abstract class OffsetEditorScreen extends Screen {
 					.bounds(x + cell[1] * (w + gap), y + cell[2] * (h + gap), w, h)
 					.build();
 			stepButtons.add(button);
-			addRenderableWidget(button);
+			addControl(button);
 		}
 	}
 
@@ -175,19 +184,19 @@ abstract class OffsetEditorScreen extends Screen {
 		int h = CORNER_BUTTON_HEIGHT;
 		int gap = CORNER_BUTTON_GAP;
 
-		addRenderableWidget(Button.builder(Component.literal("⌜"), b -> snap.snap(true, false))
+		addControl(Button.builder(Component.literal("⌜"), b -> snap.snap(true, false))
 				.bounds(x, y, w, h)
 				.tooltip(Tooltip.create(Component.translatable(keyPrefix + ".snap_top_left")))
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌝"), b -> snap.snap(true, true))
+		addControl(Button.builder(Component.literal("⌝"), b -> snap.snap(true, true))
 				.bounds(x + w + gap, y, w, h)
 				.tooltip(Tooltip.create(Component.translatable(keyPrefix + ".snap_top_right")))
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌞"), b -> snap.snap(false, false))
+		addControl(Button.builder(Component.literal("⌞"), b -> snap.snap(false, false))
 				.bounds(x, y + h + gap, w, h)
 				.tooltip(Tooltip.create(Component.translatable(keyPrefix + ".snap_bottom_left")))
 				.build());
-		addRenderableWidget(Button.builder(Component.literal("⌟"), b -> snap.snap(false, true))
+		addControl(Button.builder(Component.literal("⌟"), b -> snap.snap(false, true))
 				.bounds(x + w + gap, y + h + gap, w, h)
 				.tooltip(Tooltip.create(Component.translatable(keyPrefix + ".snap_bottom_right")))
 				.build());

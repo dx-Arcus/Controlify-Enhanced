@@ -21,12 +21,14 @@ public class ControlifySettings {
 	private final Int2ObjectSortedMap<ProfileSettings> profileSettings;
 	private GlobalSettings globalSettings;
 	private AimAssistSettings aimAssistSettings;
+	private TouchSettings touchSettings;
 	private final Map<String, DeviceSettings> deviceSettings;
 
 	private ControlifySettings() {
 		this.profileSettings = new Int2ObjectAVLTreeMap<>();
 		this.globalSettings = GlobalSettings.defaults();
 		this.aimAssistSettings = AimAssistSettings.defaults();
+		this.touchSettings = TouchSettings.defaults();
 		this.deviceSettings = new HashMap<>();
 	}
 
@@ -40,6 +42,11 @@ public class ControlifySettings {
 
 	public AimAssistSettings aimAssistSettings() {
 		return this.aimAssistSettings;
+	}
+
+	/** The touch controls' layout (tl117). */
+	public TouchSettings touchSettings() {
+		return this.touchSettings;
 	}
 
 	public Map<String, DeviceSettings> deviceSettings() {
@@ -73,6 +80,7 @@ public class ControlifySettings {
 		ControlifySettings settings = defaults();
 		settings.globalSettings = GlobalSettings.fromDTO(dto.globalConfig());
 		settings.aimAssistSettings = AimAssistSettings.fromDTO(dto.aimAssistConfig());
+		settings.touchSettings = TouchSettings.fromDTO(dto.touchConfig());
 		dto.deviceConfig().forEach((uid, config) -> {
 			DeviceSettings device = DeviceSettings.fromDTO(config);
 			if (device.name.isBlank()) {
@@ -91,7 +99,8 @@ public class ControlifySettings {
 						(map, entry) -> map.put(entry.getKey(), entry.getValue().toDTO()),
 						HashMap::putAll
 				),
-				aimAssistSettings.toDTO()
+				aimAssistSettings.toDTO(),
+				touchSettings.toDTO()
 		);
 	}
 }

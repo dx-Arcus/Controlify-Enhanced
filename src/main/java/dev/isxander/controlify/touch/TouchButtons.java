@@ -50,6 +50,10 @@ import java.util.Set;
  *
  * <p>On a screen none of these is drawn or pressed. A close button is drawn instead, in the top-right corner
  * of any screen that Esc would close, and a tap on it closes the screen as Esc does ({@link #CLOSE}, tl116).
+ *
+ * <p>The player places the five on the right as one, in the glyph editor's Touch tab (tl117): moved together
+ * and sized together, from half to twice their size, growing from their corner ({@link #box(Button, int, int,
+ * TouchPad.Layout)}), and kept inside the window ({@link #shift}). Chat and pause stay where they are.
  */
 public final class TouchButtons {
 	/** A tapped button stays pressed at least this long, so the controller's tick - twenty a second - sees it. */
@@ -246,6 +250,9 @@ public final class TouchButtons {
 	/** How high the game stacks its HUD over the hotbar's width, in GUI pixels up from the bottom: the hotbar, the experience bar, health and food, armour and air. */
 	static final int HUD_STACK_HEIGHT = 49;
 
+	/** How many of their own units the five stand, from jump's top to use's foot (tl117). */
+	static final float GROUP_HEIGHT = groupHeight();
+
 	/** Each button's frame and picture as rectangles of colour, worked out once. */
 	private static final Map<Icon, int[][]> REST_RECTS = new EnumMap<>(Icon.class);
 	private static final Map<Icon, int[][]> HELD_RECTS = new EnumMap<>(Icon.class);
@@ -292,28 +299,108 @@ public final class TouchButtons {
 		}
 	}
 
-	/** Where a button sits in a window of this many pixels. */
+	/** Where a button sits in a window of this many pixels, nothing moved or resized. */
 	static Box box(Button button, int width, int height) {
-		int unit = Math.max(1, Math.round(button.size() * height / GRID));
-		int side = unit * GRID;
-		int centreX = Math.round(button.fromX() * width + button.offsetX() * unit);
-		int centreY = Math.round(button.fromY() * height + button.offsetY() * unit);
-		return new Box(centreX - side / 2, centreY - side / 2, unit);
+		return box(button, width, height, TouchPad.Layout.DEFAULT);
 	}
 
 	/**
-	 * Where a button sits in this frame's window: as {@link #box(Button, int, int)}, with the ones hung from the
-	 * bottom lifted, together, just clear of the hotbar and what the game stacks over it, or of the slot of three
-	 * dots, wherever one of them would reach over it - only a narrow window at a large GUI scale does; at 16:9
-	 * they sit in the corner.
+	 * Where a button sits in a window of this many pixels with the player's layout (tl117): the five hung from
+	 * the bottom-right corner are moved together, by whole pixels, and sized together - their gaps in their own
+	 * units, so the group keeps its shape at any size, growing from that corner, though never taller than the
+	 * window holds - and chat, pause and the close button stay where they are.
 	 */
-	static Box box(Button button, TouchPad.View view) {
-		Box box = box(button, view.width(), view.height());
-		int lift = button.fromY() == 1f ? lift(view) : 0;
-		return lift == 0 ? box : new Box(box.x(), box.y() - lift, box.unit());
+	static Box box(Button button, int width, int height, TouchPad.Layout layout) {
+		boolean group = inGroup(button);
+		float size = group ? button.size() * layout.buttonSize() : button.size();
+		int unit = Math.max(1, Math.round(size * height / GRID));
+		if (group) {
+			unit = Math.min(unit, Math.max(1, (int) ((height - 1) / GROUP_HEIGHT)));
+		}
+		int side = unit * GRID;
+		int centreX = Math.round(button.fromX() * width + button.offsetX() * unit) + (group ? Math.round(layout.buttonsX() * height) : 0);
+		int centreY = Math.round(button.fromY() * height + button.offsetY() * unit) + (group ? Math.round(layout.buttonsY() * height) : 0);
+		return new Box(centreX - side / 2, centreY - side / 2, unit);
 	}
 
-	/** How far the buttons hung from the bottom go up, a unit clear of the hotbar's stack and the three dots; 0 when none reaches over them, or there is no hotbar. */
+	/** Whether a button is one of the five hung from the bottom-right corner, which the player moves and sizes together. */
+	static boolean inGroup(Button button) {
+		return button.fromY() == 1f;
+	}
+
+	/** See {@link #GROUP_HEIGHT}: from the highest top to the lowest foot of the five, in their units. */
+	private static float groupHeight() {
+		float top = Float.NEGATIVE_INFINITY;
+		float foot = Float.POSITIVE_INFINITY;
+		for (Button button : BUTTONS) {
+			if (inGroup(button)) {
+				top = Math.max(top, -button.offsetY() + GRID / 2f);
+				foot = Math.min(foot, -button.offsetY() - GRID / 2f);
+			}
+		}
+		return top - foot;
+	}
+
+	/**
+	 * Where a button sits in this frame's window: as {@link #box(Button, int, int, TouchPad.Layout)} with the
+	 * view's layout, the ones hung from the bottom moved together by {@link #shift}.
+	 */
+	static Box box(Button button, TouchPad.View view) {
+		Box box = box(button, view.width(), view.height(), view.layout());
+		if (!inGroup(button)) {
+			return box;
+		}
+		int[] shift = shift(view);
+		return shift[0] == 0 && shift[1] == 0 ? box : new Box(box.x() + shift[0], box.y() + shift[1], box.unit());
+	}
+
+	/**
+	 * How far the five hung from the bottom move, together, from where the layout puts them, in window pixels,
+	 * right and down positive: lifted just clear of the hotbar and what the game stacks over it, or of the slot of
+	 * three dots, wherever one of them would reach over it ({@link #lift}) - only a narrow window at a large GUI
+	 * scale does at their default place and size; at 16:9 they sit in the corner - then brought back inside the
+	 * window from any edge they would cross (tl117), so however the player moved and sized them every one can be
+	 * reached; were they ever too big for the window, the edges of their own corner would win. At their default
+	 * place and size they cross none.
+	 */
+	static int[] shift(TouchPad.View view) {
+		int up = lift(view);
+		int[] bounds = bounds(view.width(), view.height(), view.layout());
+		int left = bounds[0];
+		int top = bounds[1] - up;
+		int right = bounds[2];
+		int bottom = bounds[3] - up;
+		int dx = left < 0 ? -left : 0;
+		if (right + dx > view.width()) {
+			dx = view.width() - right;
+		}
+		int dy = top < 0 ? -top : 0;
+		if (bottom + dy > view.height()) {
+			dy = view.height() - bottom;
+		}
+		return new int[] {dx, dy - up};
+	}
+
+	/** Where the layout puts the five, in a window of this many pixels, together: their left, top, right and bottom edges. */
+	static int[] bounds(int width, int height, TouchPad.Layout layout) {
+		int left = Integer.MAX_VALUE;
+		int top = Integer.MAX_VALUE;
+		int right = Integer.MIN_VALUE;
+		int bottom = Integer.MIN_VALUE;
+		for (Button button : BUTTONS) {
+			if (!inGroup(button)) {
+				continue;
+			}
+			Box box = box(button, width, height, layout);
+			left = Math.min(left, box.x());
+			top = Math.min(top, box.y());
+			right = Math.max(right, box.x() + box.side());
+			bottom = Math.max(bottom, box.y() + box.side());
+		}
+		return new int[] {left, top, right, bottom};
+	}
+
+	/** How far the five hung from the bottom go up, a unit clear of the hotbar's stack and the three dots; 0 when none reaches over them, or there is no hotbar. */
 	static int lift(TouchPad.View view) {
 		if (!view.hotbar()) {
 			return 0;
@@ -327,10 +414,10 @@ public final class TouchButtons {
 		int slotTop = (view.guiHeight() - HOTBAR_HEIGHT - 1) * scale;
 		int lift = 0;
 		for (Button button : BUTTONS) {
-			if (button.fromY() != 1f) {
+			if (!inGroup(button)) {
 				continue;
 			}
-			Box box = box(button, view.width(), view.height());
+			Box box = box(button, view.width(), view.height(), view.layout());
 			int left = box.x();
 			int right = box.x() + box.side();
 			int bottom = box.y() + box.side() + box.unit();
@@ -486,13 +573,17 @@ public final class TouchButtons {
 
 	/**
 	 * Draws the buttons into the window's own pixels (the GUI is {@code scale} pixels a unit, so the pose is
-	 * scaled down by it), then the inventory slot in GUI pixels after the hotbar's end.
+	 * scaled down by it), then the inventory slot in GUI pixels after the hotbar's end; for the glyph editor's
+	 * preview ({@code placedOnly}, tl117), only the five the player places.
 	 */
-	static void render(GuiGraphicsExtractor graphics, TouchPad.View view) {
+	static void render(GuiGraphicsExtractor graphics, TouchPad.View view, boolean placedOnly) {
 		Matrix3x2fStack pose = graphics.pose().pushMatrix();
 		pose.scale(1f / view.scale(), 1f / view.scale());
 		for (int i = 0; i < BUTTONS.size(); i++) {
 			Button button = BUTTONS.get(i);
+			if (placedOnly && !inGroup(button)) {
+				continue;
+			}
 			Box box = box(button, view);
 			boolean down = held(i, view.nanos());
 			int[][] rects = (down ? HELD_RECTS : REST_RECTS).get(icon(button, view.flying()));
@@ -503,7 +594,7 @@ public final class TouchButtons {
 		}
 		pose.popMatrix();
 
-		if (view.hotbar()) {
+		if (view.hotbar() && !placedOnly) {
 			int x = view.inventoryX();
 			int y = view.guiHeight() - HOTBAR_HEIGHT;
 			// The hotbar's own last slot and right end, so it reads as a tenth slot.
