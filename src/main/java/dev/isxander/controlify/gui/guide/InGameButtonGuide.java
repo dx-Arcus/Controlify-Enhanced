@@ -11,6 +11,7 @@ import dev.isxander.controlify.contextual.ContextualDomains;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.api.contextual.InGameContext;
 import dev.isxander.controlify.mixins.feature.guide.ingame.MinecraftAccessor;
+import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -37,7 +38,8 @@ public class InGameButtonGuide {
 		boolean screenOpen = MinecraftUtil.getScreen() != null;
 		GenericControllerSettings.GuideSettings settings = controller.settings().generic.guide;
 
-		if (!debugOpen && !hideGui && !screenOpen && settings.showIngameGuide) {
+		// Hidden under touch controls (tl113): the touch buttons are on screen, and these glyphs name a pad's.
+		if (!debugOpen && !hideGui && !screenOpen && settings.showIngameGuide && !TouchPad.active()) {
 			this.guideInstance.extractRenderState(
 					graphics, settings.ingameGuideBottom, true, settings.ingameGuiScale,
 					settings.ingameGuideOffsetLeftX, settings.ingameGuideOffsetLeftY,
