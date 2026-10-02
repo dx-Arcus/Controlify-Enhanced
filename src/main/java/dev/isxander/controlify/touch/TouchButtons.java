@@ -184,6 +184,64 @@ public final class TouchButtons {
 				"###..###",
 				"###..###",
 				"###..###"),
+		DPAD_UP(4, 7,
+				".....##.....",
+				"....####....",
+				"...######...",
+				"..########..",
+				".##########.",
+				"############"),
+		DPAD_DOWN(4, 7,
+				"############",
+				".##########.",
+				"..########..",
+				"...######...",
+				"....####....",
+				".....##....."),
+		DPAD_LEFT(7, 4,
+				".....#",
+				"....##",
+				"...###",
+				"..####",
+				".#####",
+				"######",
+				"######",
+				".#####",
+				"..####",
+				"...###",
+				"....##",
+				".....#"),
+		DPAD_RIGHT(7, 4,
+				"#.....",
+				"##....",
+				"###...",
+				"####..",
+				"#####.",
+				"######",
+				"######",
+				"#####.",
+				"####..",
+				"###...",
+				"##....",
+				"#....."),
+		DPAD_UP_LEFT(5, 5,
+				"########",
+				"#######.",
+				"######..",
+				"#####...",
+				"####....",
+				"###.....",
+				"##......",
+				"#......."),
+		DPAD_UP_RIGHT(6, 5,
+				"########",
+				".#######",
+				"..######",
+				"...#####",
+				"....####",
+				".....###",
+				"......##",
+				".......#"),
 		CLOSE(4, 4,
 				"###......###",
 				".###....###.",
@@ -326,7 +384,7 @@ public final class TouchButtons {
 	 */
 	static Box box(Button button, int width, int height, TouchPad.Layout layout, TouchMode mode) {
 		boolean group = inGroup(button);
-		Button place = group && mode == TouchMode.TAP ? lower(button) : button;
+		Button place = group && mode != TouchMode.CROSSHAIR ? lower(button) : button;
 		float size = group ? button.size() * layout.buttonSize() : button.size();
 		int unit = Math.max(1, Math.round(size * height / GRID));
 		if (group) {
@@ -363,7 +421,12 @@ public final class TouchButtons {
 	 * attacks, so the two that pull the triggers - attack and use - are not, as Bedrock's tap mode has neither.
 	 */
 	static boolean shown(Button button, TouchMode mode) {
-		return mode != TouchMode.TAP || button.axis() < 0;
+		return switch (mode) {
+			case CROSSHAIR -> true;
+			case TAP -> button.axis() < 0;
+			// D-pad mode (tl121): jump alone on the right; sprint and sneak are the D-pad's.
+			case DPAD -> !inGroup(button) || button.icon() == Icon.JUMP;
+		};
 	}
 
 	/** See {@link #GROUP_HEIGHT}: from the highest top to the lowest foot of the five, in their units. */
@@ -647,6 +710,14 @@ public final class TouchButtons {
 				graphics.fill(x + 6 + dot * 5, y + 11, x + 8 + dot * 5, y + 13, SHADOW);
 				graphics.fill(x + 5 + dot * 5, y + 10, x + 7 + dot * 5, y + 12, PICTURE | 0xFF000000);
 			}
+		}
+	}
+
+	/** Draws a button's frame with this picture into a box, at rest or held; the pose already in the window's pixels (tl121, the D-pad). */
+	static void drawFramed(GuiGraphicsExtractor graphics, Icon icon, Box box, boolean held) {
+		int u = box.unit();
+		for (int[] r : (held ? HELD_RECTS : REST_RECTS).get(icon)) {
+			graphics.fill(box.x() + r[0] * u, box.y() + r[1] * u, box.x() + r[2] * u, box.y() + r[3] * u, r[4]);
 		}
 	}
 

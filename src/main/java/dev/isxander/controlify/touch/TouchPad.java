@@ -214,9 +214,9 @@ public final class TouchPad {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, mode, null);
 		}
 
-		/** Whether a tap on the world uses and attacks, and a hold breaks (tl118). */
+		/** Whether a tap on the world uses and attacks, and a hold breaks (tl118) - in D-pad mode too (tl121). */
 		boolean tap() {
-			return mode == TouchMode.TAP;
+			return mode != TouchMode.CROSSHAIR;
 		}
 
 		float aspect() {
@@ -242,7 +242,7 @@ public final class TouchPad {
 	 * following the finger ({@link TouchTap#pick}), and no aim assist.
 	 */
 	public static boolean tapMode() {
-		return active && mode() == TouchMode.TAP;
+		return active && mode() != TouchMode.CROSSHAIR;
 	}
 
 	/**
@@ -534,14 +534,14 @@ public final class TouchPad {
 		for (TouchInput.Finger finger : fingers) {
 			FingerKey key = FingerKey.of(finger);
 			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)
-					|| TouchTap.owns(key) || TouchInteract.owns(key)) {
+					|| TouchTap.owns(key) || TouchInteract.owns(key) || TouchDpad.owns(key)) {
 				continue;
 			}
 			boolean landed = !seen.contains(key);
-			if (landed && (TouchInteract.claim(finger, view) || TouchButtons.claim(finger, view))) {
+			if (landed && (TouchInteract.claim(finger, view) || TouchDpad.claim(finger, view) || TouchButtons.claim(finger, view))) {
 				continue;
 			}
-			if (stick == null && (view.tap() ? onRest(finger, view) : (finger.x() < STICK_ZONE || onRest(finger, view)))) {
+			if (stick == null && view.mode() != TouchMode.DPAD && (view.tap() ? onRest(finger, view) : (finger.x() < STICK_ZONE || onRest(finger, view)))) {
 				stickFinger = key;
 				anchorX = finger.x();
 				anchorY = finger.y();
@@ -556,7 +556,13 @@ public final class TouchPad {
 			}
 		}
 
-		if (stick == null) {
+		if (view.mode() == TouchMode.DPAD) {
+			// The D-pad in place of the stick (tl121): full tilt its way, the diagonals at a unit's length.
+			TouchDpad.update(fingers, view);
+			float[] move = TouchDpad.direction();
+			stickFinger = null;
+			writeStick(move[0], move[1], TouchDpad.sprinting());
+		} else if (stick == null) {
 			stickFinger = null;
 			writeStick(0f, 0f, false);
 		} else {
@@ -601,7 +607,8 @@ public final class TouchPad {
 			useHeld |= TouchTap.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
 			attackHeld |= TouchTap.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
 		}
-		writeButtons(TouchButtons.buttonMask(now) | (sprinting ? 1 << SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK : 0));
+		writeButtons(TouchButtons.buttonMask(now) | (sprinting ? 1 << SdlGamepad.SDL_GAMEPAD_BUTTON_LEFT_STICK : 0)
+				| (TouchDpad.sneakHeld(now) ? 1 << SdlGamepad.SDL_GAMEPAD_BUTTON_RIGHT_STICK : 0));
 		writeTriggers(useHeld, attackHeld);
 
 		if (look == null) {
@@ -696,6 +703,7 @@ public final class TouchPad {
 		TouchButtons.letGo();
 		TouchTap.letGo();
 		TouchInteract.letGo();
+		TouchDpad.letGo();
 		writeButtons(0);
 		writeTriggers(false, false);
 	}
@@ -805,7 +813,11 @@ public final class TouchPad {
 
 	/** {@link #render}, against a given window - for tests. */
 	static void draw(GuiGraphicsExtractor graphics, View view) {
-		drawStick(graphics, view);
+		if (view.mode() == TouchMode.DPAD) {
+			TouchDpad.render(graphics, view);
+		} else {
+			drawStick(graphics, view);
+		}
 		TouchButtons.render(graphics, view, false);
 		if (view.interact() != null) {
 			Minecraft minecraft = Minecraft.getInstance();
@@ -961,6 +973,7 @@ public final class TouchPad {
 		TouchTap.letGo();
 		TouchInteract.letGo();
 		TouchInteract.clear();
+		TouchDpad.letGo();
 	}
 
 	/** For tests: the pad's buttons and triggers as last written. */

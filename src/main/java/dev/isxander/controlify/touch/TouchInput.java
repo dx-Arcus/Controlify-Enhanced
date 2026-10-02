@@ -331,6 +331,13 @@ public final class TouchInput {
 	public static void setMouseAsFinger(boolean on) {
 		if (SDLHints.SDL_SetHint(SDLHints.SDL_HINT_MOUSE_TOUCH_EVENTS, on ? "1" : "0")) {
 			mouseAsFinger = on;
+			if (!on) {
+				// SDL drops its stand-in device without lifting the finger on it - the press that turned this off,
+				// since a button acts as it goes down - so that finger would stay down for good (tl121).
+				synchronized (FINGERS) {
+					FINGERS.keySet().removeIf(key -> key.touchId() == MOUSE_TOUCH_ID);
+				}
+			}
 		} else {
 			CUtil.LOGGER.warn("Touch: the game's SDL refused the mouse-as-finger hint");
 		}

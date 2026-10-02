@@ -75,7 +75,7 @@ public final class AntiCheatWarning {
 		if (global.analogueMovementDefaultEnabled && !global.alwaysKeyboardMovement) {
 			risky.add(Component.translatable("controlify.gui.analogue_movement_default_enabled"));
 		}
-		if (touch != null && TouchInput.SUPPORTED && touch.mode == TouchMode.TAP) {
+		if (touch != null && TouchInput.SUPPORTED && touch.mode != TouchMode.CROSSHAIR) {
 			risky.add(set("controlify.touch.mode", touch.mode.getDisplayName()));
 		}
 		return risky;

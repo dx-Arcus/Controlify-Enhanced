@@ -26,7 +26,13 @@ public enum TouchMode implements NameableEnum, StringRepresentable {
 	 * the world taps, holds or drags - a tap uses a block or attacks a mob, a hold breaks a block or uses the
 	 * item in hand, a drag looks ({@link TouchPad}). Attack and use have no buttons.
 	 */
-	TAP;
+	TAP,
+	/**
+	 * D-pad &amp; tap to interact (tl121): as tap to interact, with Bedrock's D-pad in place of the stick - forward,
+	 * back and the sides, sneak in the middle, the two diagonals beside forward while it is held, forward tapped twice
+	 * to sprint ({@link TouchDpad}) - and jump alone on the right.
+	 */
+	DPAD;
 
 	public static final Codec<TouchMode> CODEC = StringRepresentable.fromEnum(TouchMode::values);
 

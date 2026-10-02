@@ -1192,7 +1192,7 @@ public final class TouchInteract {
 	/** What the button acts on: the game's pick through the middle of the screen in tap mode, its own pick otherwise. */
 	private static @Nullable Entity target(Minecraft minecraft, LocalPlayer player, TouchMode mode) {
 		HitResult hit;
-		if (mode == TouchMode.TAP) {
+		if (mode != TouchMode.CROSSHAIR) {
 			Entity camera = minecraft.getCameraEntity();
 			if (camera == null) {
 				return null;
