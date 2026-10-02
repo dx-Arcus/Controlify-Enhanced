@@ -207,7 +207,8 @@ public final class TouchTap {
 
 	/** The finger has lifted: a tap if it was still undecided; a hold lets its trigger go with it. */
 	private static void lifted(long now, Target target) {
-		if (phase == Phase.PENDING) {
+		// A tap while the Pick Block button is armed picks there instead (tl128).
+		if (phase == Phase.PENDING && !TouchPick.tapped(fingerX, fingerY)) {
 			press(target.at(fingerX, fingerY) == HitResult.Type.ENTITY ? ATTACK : USE, now, fingerX, fingerY);
 		}
 		finger = null;

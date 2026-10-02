@@ -13,8 +13,8 @@ import net.minecraft.util.Mth;
 
 /**
  * The touch controls' settings, live: the layout (tl117), edited in the glyph editor's Touch tab, the mode (tl118),
- * when they are on (tl120), the camera sensitivity (tl123), the spyglass damping (tl127) and auto jump (tl124), set in
- * the touch settings screen - all read every frame by the touch controls.
+ * when they are on (tl120), the camera sensitivity (tl123), the spyglass damping (tl127), auto jump (tl124) and the
+ * Pick Block button (tl128), set in the touch settings screen - all read every frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */
@@ -33,9 +33,12 @@ public class TouchSettings {
 	public boolean autoJump;
 	/** How much a swipe slows while looking through a spyglass, {@link TouchConfig#MIN_DAMPING} to {@link TouchConfig#MAX_DAMPING}. */
 	public int spyglassDamping;
+	/** Whether the Pick Block button is shown. */
+	public boolean pickBlock;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY,
-			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping) {
+			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping,
+			boolean pickBlock) {
 		this.stickOffsetX = stickOffsetX;
 		this.stickOffsetY = stickOffsetY;
 		this.stickSize = size(stickSize);
@@ -47,6 +50,7 @@ public class TouchSettings {
 		this.cameraSensitivity = Mth.clamp(cameraSensitivity, TouchConfig.MIN_SENSITIVITY, TouchConfig.MAX_SENSITIVITY);
 		this.autoJump = autoJump;
 		this.spyglassDamping = Mth.clamp(spyglassDamping, TouchConfig.MIN_DAMPING, TouchConfig.MAX_DAMPING);
+		this.pickBlock = pickBlock;
 	}
 
 	/** A size within what the Touch tab offers; a number that is not one at all is the default. */
@@ -61,12 +65,12 @@ public class TouchSettings {
 	public static TouchSettings fromDTO(TouchConfig dto) {
 		return new TouchSettings(offset(dto.stickOffsetX()), offset(dto.stickOffsetY()), dto.stickSize(),
 				offset(dto.buttonsOffsetX()), offset(dto.buttonsOffsetY()), dto.buttonSize(), dto.mode(), dto.controls(),
-				dto.cameraSensitivity(), dto.autoJump(), dto.spyglassDamping());
+				dto.cameraSensitivity(), dto.autoJump(), dto.spyglassDamping(), dto.pickBlock());
 	}
 
 	public TouchConfig toDTO() {
 		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls,
-				cameraSensitivity, autoJump, spyglassDamping);
+				cameraSensitivity, autoJump, spyglassDamping, pickBlock);
 	}
 
 	/** An offset as read: a number that is not one at all is none. */

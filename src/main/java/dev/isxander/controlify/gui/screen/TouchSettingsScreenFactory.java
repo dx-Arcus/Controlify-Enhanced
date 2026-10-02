@@ -28,7 +28,8 @@ import net.minecraft.network.chat.Component;
 /**
  * The touch controls' own settings screen (tl122), opened from Global Settings, after Bedrock's Touch settings page:
  * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, how fast a
- * swipe turns the camera (tl123) and how much it slows through a spyglass (tl127), and auto jump (tl124).
+ * swipe turns the camera (tl123) and how much it slows through a spyglass (tl127), the Pick Block button (tl128), and
+ * auto jump (tl124).
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -85,6 +86,12 @@ public final class TouchSettingsScreenFactory {
 								.controller(option -> IntegerSliderControllerBuilder.create(option)
 										.range(TouchConfig.MIN_DAMPING, TouchConfig.MAX_DAMPING)
 										.step(1))
+								.build())
+						.option(Option.<Boolean>createBuilder()
+								.name(Component.translatable("controlify.touch.pick_block"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.pick_block.tooltip")))
+								.binding(defaults.pickBlock, () -> touch.pickBlock, value -> touch.pickBlock = value)
+								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
 								.build())
 						.option(Option.<Boolean>createBuilder()
 								.name(Component.translatable("controlify.touch.auto_jump"))

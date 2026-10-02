@@ -382,7 +382,9 @@ public final class TouchPad {
 		TouchInteract.frame(minecraft, mode(), window.getGuiScaledWidth(), window.getGuiScaledHeight());
 		TouchTap.breakProgress(minecraft.gameMode != null && minecraft.gameMode.isDestroying()
 				? (minecraft.gameMode.getDestroyStage() + 1) / 10f : 0f);
+		TouchPick.setEnabled(pickBlock());
 		Turn turn = readFingers(TouchInput.fingers(), view(minecraft));
+		TouchPick.pick(minecraft);
 		int slot = TouchButtons.takeSlot();
 		if (slot >= 0) {
 			minecraft.player.getInventory().setSelectedSlot(slot);
@@ -477,6 +479,12 @@ public final class TouchPad {
 	public static boolean autoJump() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? TouchConfig.DEFAULT.autoJump() : config.getSettings().touchSettings().autoJump;
+	}
+
+	/** Whether the Pick Block button is shown (tl128), or not before there is a config to read it from, as by default. */
+	static boolean pickBlock() {
+		ConfigManager config = Controlify.instance().config();
+		return config != null && config.getSettings().touchSettings().pickBlock;
 	}
 
 	/** The player's spyglass damping (tl127), or the middle before there is a config to read it from. */
@@ -584,11 +592,12 @@ public final class TouchPad {
 		for (TouchInput.Finger finger : fingers) {
 			FingerKey key = FingerKey.of(finger);
 			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)
-					|| TouchTap.owns(key) || TouchInteract.owns(key) || TouchDpad.owns(key)) {
+					|| TouchTap.owns(key) || TouchInteract.owns(key) || TouchPick.owns(key) || TouchDpad.owns(key)) {
 				continue;
 			}
 			boolean landed = !seen.contains(key);
-			if (landed && (TouchInteract.claim(finger, view) || TouchDpad.claim(finger, view) || TouchButtons.claim(finger, view))) {
+			if (landed && (TouchInteract.claim(finger, view) || TouchPick.claim(finger, view) || TouchDpad.claim(finger, view)
+					|| TouchButtons.claim(finger, view))) {
 				continue;
 			}
 			if (stick == null && view.mode() != TouchMode.DPAD && (view.tap() ? onRest(finger, view) : (finger.x() < STICK_ZONE || onRest(finger, view)))) {
@@ -631,6 +640,7 @@ public final class TouchPad {
 		long now = view.nanos();
 		boolean useHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, now);
 		useHeld |= TouchInteract.update(fingers, view);
+		TouchPick.update(fingers);
 		boolean attackHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, now);
 		if (view.tap()) {
 			TouchTap.update(fingers, view, target);
@@ -753,6 +763,7 @@ public final class TouchPad {
 		TouchButtons.letGo();
 		TouchTap.letGo();
 		TouchInteract.letGo();
+		TouchPick.letGo();
 		TouchDpad.letGo();
 		writeButtons(0);
 		writeTriggers(false, false);
@@ -869,6 +880,7 @@ public final class TouchPad {
 			drawStick(graphics, view);
 		}
 		TouchButtons.render(graphics, view, false);
+		TouchPick.render(graphics, view);
 		if (view.interact() != null) {
 			Minecraft minecraft = Minecraft.getInstance();
 			TouchInteract.draw(graphics, minecraft == null ? null : minecraft.font, view.interact(), TouchInteract.pressed());
@@ -1023,6 +1035,7 @@ public final class TouchPad {
 		TouchTap.letGo();
 		TouchInteract.letGo();
 		TouchInteract.clear();
+		TouchPick.letGo();
 		TouchDpad.letGo();
 	}
 

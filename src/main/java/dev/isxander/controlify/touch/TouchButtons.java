@@ -87,7 +87,7 @@ public final class TouchButtons {
 	 * The pictures, the mod's own: on the {@link #GRID}-unit grid, where the top-left of each sits, then its
 	 * rows. Jump and sneak a caret up and down, flying up and down a double one; sprint an arrow with speed
 	 * lines; attack an upright sword with a point; use an open hand; chat a bubble with lines of text; pause
-	 * two bars; close sneak's caret over jump's, tip to tip. Each casts a shadow a unit down and right, worked
+	 * two bars; pick block an eyedropper (tl128); close sneak's caret over jump's, tip to tip. Each casts a shadow a unit down and right, worked
 	 * out from its rows ({@link #rects}).
 	 */
 	enum Icon {
@@ -242,6 +242,18 @@ public final class TouchButtons {
 				".....###",
 				"......##",
 				".......#"),
+		PICK(4, 4,
+				".........###",
+				"........####",
+				".......####.",
+				"....#.####..",
+				".....####...",
+				"....###.#...",
+				"...###......",
+				"..###.......",
+				".###........",
+				".##.........",
+				"#..........."),
 		CLOSE(4, 4,
 				"###......###",
 				".###....###.",

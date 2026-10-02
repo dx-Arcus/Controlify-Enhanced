@@ -18,8 +18,9 @@ import dev.isxander.controlify.touch.TouchMode;
  * (tl118, {@code mode}: {@code crosshair} or {@code tap}), when they are on (tl120, {@code controls}:
  * {@code automatic}, {@code on} or {@code off}), how fast a swipe turns the camera (tl123,
  * {@code camera_sensitivity}: 0 to 100, Bedrock's slider), how much it slows while looking through a spyglass (tl127,
- * {@code spyglass_damping}: 0 to 100), and whether walking into a single block jumps up it while they are on (tl124,
- * {@code auto_jump}: on by default, as Bedrock has it for touch).
+ * {@code spyglass_damping}: 0 to 100), whether walking into a single block jumps up it while they are on (tl124,
+ * {@code auto_jump}: on by default, as Bedrock has it for touch), and whether the Pick Block button shows (tl128,
+ * {@code pick_block}: off by default, as Bedrock's).
  * <p>
  * Every key has a default and is left out of the file while it holds it, so a config saved before either loads as it
  * was. Out-of-range sizes and sensitivities are not refused here - a hand-edited file must not lose every other setting for one bad
@@ -37,7 +38,8 @@ public record TouchConfig(
 		TouchControls controls,
 		int cameraSensitivity,
 		boolean autoJump,
-		int spyglassDamping
+		int spyglassDamping,
+		boolean pickBlock
 ) {
 	/** The smallest and largest size either may be set to: half and twice its default. */
 	public static final float MIN_SIZE = 0.5f;
@@ -54,7 +56,7 @@ public record TouchConfig(
 	public static final int DEFAULT_DAMPING = 50;
 
 	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC,
-			DEFAULT_SENSITIVITY, true, DEFAULT_DAMPING);
+			DEFAULT_SENSITIVITY, true, DEFAULT_DAMPING, false);
 
 	/** A layout in the mode every build before tl118 played: aim crosshair; on by themselves, as tl120 has them. */
 	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
@@ -86,6 +88,13 @@ public record TouchConfig(
 				DEFAULT_DAMPING);
 	}
 
+	/** All but the Pick Block button, which is off (tl128). */
+	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize,
+			TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping) {
+		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls, cameraSensitivity, autoJump,
+				spyglassDamping, false);
+	}
+
 	public static final Codec<TouchConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.FLOAT.optionalFieldOf("stick_offset_x", DEFAULT.stickOffsetX()).forGetter(TouchConfig::stickOffsetX),
 			Codec.FLOAT.optionalFieldOf("stick_offset_y", DEFAULT.stickOffsetY()).forGetter(TouchConfig::stickOffsetY),
@@ -97,6 +106,7 @@ public record TouchConfig(
 			TouchControls.CODEC.lenientOptionalFieldOf("controls", DEFAULT.controls()).forGetter(TouchConfig::controls),
 			Codec.INT.optionalFieldOf("camera_sensitivity", DEFAULT.cameraSensitivity()).forGetter(TouchConfig::cameraSensitivity),
 			Codec.BOOL.optionalFieldOf("auto_jump", DEFAULT.autoJump()).forGetter(TouchConfig::autoJump),
-			Codec.INT.optionalFieldOf("spyglass_damping", DEFAULT.spyglassDamping()).forGetter(TouchConfig::spyglassDamping)
+			Codec.INT.optionalFieldOf("spyglass_damping", DEFAULT.spyglassDamping()).forGetter(TouchConfig::spyglassDamping),
+			Codec.BOOL.optionalFieldOf("pick_block", DEFAULT.pickBlock()).forGetter(TouchConfig::pickBlock)
 	).apply(instance, TouchConfig::new));
 }
