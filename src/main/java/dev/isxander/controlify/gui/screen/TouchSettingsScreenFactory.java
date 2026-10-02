@@ -8,6 +8,7 @@ package dev.isxander.controlify.gui.screen;
 
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.ControlifyApi;
+import dev.isxander.controlify.config.dto.TouchConfig;
 import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
@@ -19,12 +20,14 @@ import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
+import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 /**
  * The touch controls' own settings screen (tl122), opened from Global Settings, after Bedrock's Touch settings page:
- * when they are on, the mode they play in, and the way to the glyph editor's Touch tab to move and size them.
+ * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, and how fast a
+ * swipe turns the camera (tl123).
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -65,6 +68,14 @@ public final class TouchSettingsScreenFactory {
 								.action((screen, button) -> ControlifyApi.get().getCurrentController().ifPresent(controller ->
 										MinecraftUtil.setScreen(new GuideOffsetEditScreen(screen, controller.settings().generic.guide, controller))))
 								.available(ControlifyApi.get().getCurrentController().isPresent())
+								.build())
+						.option(Option.<Integer>createBuilder()
+								.name(Component.translatable("controlify.touch.camera_sensitivity"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.camera_sensitivity.tooltip")))
+								.binding(defaults.cameraSensitivity, () -> touch.cameraSensitivity, value -> touch.cameraSensitivity = value)
+								.controller(option -> IntegerSliderControllerBuilder.create(option)
+										.range(TouchConfig.MIN_SENSITIVITY, TouchConfig.MAX_SENSITIVITY)
+										.step(1))
 								.build())
 						.build())
 				.build().generateScreen(parent);

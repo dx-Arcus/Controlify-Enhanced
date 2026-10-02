@@ -10,6 +10,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.config.ConfigManager;
+import dev.isxander.controlify.config.dto.TouchConfig;
 import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
@@ -59,7 +60,8 @@ import java.util.Set;
  *
  * <p>The look is not a stick. A swipe is a turn, one to one, as a mouse drag is: the finger's movement
  * since the last frame, as a fraction of the window, turns the camera {@link #LOOK_DEGREES_PER_WIDTH}
- * degrees per window width, straight through {@code LocalPlayer.turn}. Pitch is scaled by the
+ * degrees per window width at the middle camera sensitivity, faster or slower as the player sets it ({@link #lookSpeed},
+ * tl123), straight through {@code LocalPlayer.turn}. Pitch is scaled by the
  * window's aspect so a finger moving a centimetre turns the same either way.
  *
  * <p>While it is on: the input mode is held at MIXED (fingers are the pad, and on a screen the mouse,
@@ -384,7 +386,8 @@ public final class TouchPad {
 			minecraft.player.getInventory().setSelectedSlot(slot);
 		}
 		if (turn.any()) {
-			minecraft.player.turn(turn.yawDegrees() * TURN_UNITS_PER_DEGREE, turn.pitchDegrees() * TURN_UNITS_PER_DEGREE);
+			float units = lookSpeed(cameraSensitivity()) * TURN_UNITS_PER_DEGREE;
+			minecraft.player.turn(turn.yawDegrees() * units, turn.pitchDegrees() * units);
 		}
 	}
 
@@ -458,6 +461,22 @@ public final class TouchPad {
 	static TouchControls controls() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? TouchControls.AUTOMATIC : config.getSettings().touchSettings().controls;
+	}
+
+	/** The player's camera sensitivity (tl123), or the middle before there is a config to read it from. */
+	static int cameraSensitivity() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TouchConfig.DEFAULT_SENSITIVITY : config.getSettings().touchSettings().cameraSensitivity;
+	}
+
+	/**
+	 * How fast a swipe turns the camera at a camera sensitivity (tl123), as a multiple of {@link #LOOK_DEGREES_PER_WIDTH}: the
+	 * curve the game's own mouse sensitivity follows, so the middle, 50, is that speed, 100 about four times it and 0 about a
+	 * sixteenth.
+	 */
+	static float lookSpeed(int sensitivity) {
+		float f = 0.2f + 0.6f * sensitivity / 100f;
+		return f * f * f * 8f;
 	}
 
 	/** The mode the player chose (tl118), or aim crosshair before there is a config to read it from. */

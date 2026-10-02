@@ -15,11 +15,12 @@ import dev.isxander.controlify.touch.TouchMode;
  * The touch controls' settings, as saved: their layout (tl117) - how far the stick's resting place and the five action
  * buttons are moved from where they sit by default, as fractions of the window's height, right and down positive, and
  * how big each is, as a fraction of its default size, set in the glyph editor's Touch tab - the mode they play in
- * (tl118, {@code mode}: {@code crosshair} or {@code tap}), and when they are on (tl120, {@code controls}:
- * {@code automatic}, {@code on} or {@code off}).
+ * (tl118, {@code mode}: {@code crosshair} or {@code tap}), when they are on (tl120, {@code controls}:
+ * {@code automatic}, {@code on} or {@code off}), and how fast a swipe turns the camera (tl123,
+ * {@code camera_sensitivity}: 0 to 100, Bedrock's slider).
  * <p>
  * Every key has a default and is left out of the file while it holds it, so a config saved before either loads as it
- * was. Out-of-range sizes are not refused here - a hand-edited file must not lose every other setting for one bad
+ * was. Out-of-range sizes and sensitivities are not refused here - a hand-edited file must not lose every other setting for one bad
  * number - but clamped when read ({@code TouchSettings.fromDTO}); a mode or a setting for when they are on that this
  * build does not know - one a later build wrote, or a typing slip - is read as the default, for the same reason.
  */
@@ -31,13 +32,20 @@ public record TouchConfig(
 		float buttonsOffsetY,
 		float buttonSize,
 		TouchMode mode,
-		TouchControls controls
+		TouchControls controls,
+		int cameraSensitivity
 ) {
 	/** The smallest and largest size either may be set to: half and twice its default. */
 	public static final float MIN_SIZE = 0.5f;
 	public static final float MAX_SIZE = 2f;
 
-	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC);
+	/** The camera sensitivity's range, as Bedrock's slider has it, and its default: the middle, the speed every build before tl123 turned at. */
+	public static final int MIN_SENSITIVITY = 0;
+	public static final int MAX_SENSITIVITY = 100;
+	public static final int DEFAULT_SENSITIVITY = 50;
+
+	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC,
+			DEFAULT_SENSITIVITY);
 
 	/** A layout in the mode every build before tl118 played: aim crosshair; on by themselves, as tl120 has them. */
 	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
@@ -50,6 +58,12 @@ public record TouchConfig(
 		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, TouchControls.AUTOMATIC);
 	}
 
+	/** A layout, a mode and when they are on, at the middle camera sensitivity (tl123). */
+	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize,
+			TouchMode mode, TouchControls controls) {
+		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls, DEFAULT_SENSITIVITY);
+	}
+
 	public static final Codec<TouchConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.FLOAT.optionalFieldOf("stick_offset_x", DEFAULT.stickOffsetX()).forGetter(TouchConfig::stickOffsetX),
 			Codec.FLOAT.optionalFieldOf("stick_offset_y", DEFAULT.stickOffsetY()).forGetter(TouchConfig::stickOffsetY),
@@ -58,6 +72,7 @@ public record TouchConfig(
 			Codec.FLOAT.optionalFieldOf("buttons_offset_y", DEFAULT.buttonsOffsetY()).forGetter(TouchConfig::buttonsOffsetY),
 			Codec.FLOAT.optionalFieldOf("button_size", DEFAULT.buttonSize()).forGetter(TouchConfig::buttonSize),
 			TouchMode.CODEC.lenientOptionalFieldOf("mode", DEFAULT.mode()).forGetter(TouchConfig::mode),
-			TouchControls.CODEC.lenientOptionalFieldOf("controls", DEFAULT.controls()).forGetter(TouchConfig::controls)
+			TouchControls.CODEC.lenientOptionalFieldOf("controls", DEFAULT.controls()).forGetter(TouchConfig::controls),
+			Codec.INT.optionalFieldOf("camera_sensitivity", DEFAULT.cameraSensitivity()).forGetter(TouchConfig::cameraSensitivity)
 	).apply(instance, TouchConfig::new));
 }
