@@ -16,8 +16,9 @@ import dev.isxander.controlify.touch.TouchMode;
  * buttons are moved from where they sit by default, as fractions of the window's height, right and down positive, and
  * how big each is, as a fraction of its default size, set in the glyph editor's Touch tab - the mode they play in
  * (tl118, {@code mode}: {@code crosshair} or {@code tap}), when they are on (tl120, {@code controls}:
- * {@code automatic}, {@code on} or {@code off}), and how fast a swipe turns the camera (tl123,
- * {@code camera_sensitivity}: 0 to 100, Bedrock's slider).
+ * {@code automatic}, {@code on} or {@code off}), how fast a swipe turns the camera (tl123,
+ * {@code camera_sensitivity}: 0 to 100, Bedrock's slider), and whether walking into a single block jumps up it while
+ * they are on (tl124, {@code auto_jump}: on by default, as Bedrock has it for touch).
  * <p>
  * Every key has a default and is left out of the file while it holds it, so a config saved before either loads as it
  * was. Out-of-range sizes and sensitivities are not refused here - a hand-edited file must not lose every other setting for one bad
@@ -33,7 +34,8 @@ public record TouchConfig(
 		float buttonSize,
 		TouchMode mode,
 		TouchControls controls,
-		int cameraSensitivity
+		int cameraSensitivity,
+		boolean autoJump
 ) {
 	/** The smallest and largest size either may be set to: half and twice its default. */
 	public static final float MIN_SIZE = 0.5f;
@@ -45,7 +47,7 @@ public record TouchConfig(
 	public static final int DEFAULT_SENSITIVITY = 50;
 
 	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC,
-			DEFAULT_SENSITIVITY);
+			DEFAULT_SENSITIVITY, true);
 
 	/** A layout in the mode every build before tl118 played: aim crosshair; on by themselves, as tl120 has them. */
 	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
@@ -64,6 +66,12 @@ public record TouchConfig(
 		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls, DEFAULT_SENSITIVITY);
 	}
 
+	/** A layout, a mode, when they are on and a camera sensitivity, with auto jump on (tl124). */
+	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize,
+			TouchMode mode, TouchControls controls, int cameraSensitivity) {
+		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls, cameraSensitivity, true);
+	}
+
 	public static final Codec<TouchConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.FLOAT.optionalFieldOf("stick_offset_x", DEFAULT.stickOffsetX()).forGetter(TouchConfig::stickOffsetX),
 			Codec.FLOAT.optionalFieldOf("stick_offset_y", DEFAULT.stickOffsetY()).forGetter(TouchConfig::stickOffsetY),
@@ -73,6 +81,7 @@ public record TouchConfig(
 			Codec.FLOAT.optionalFieldOf("button_size", DEFAULT.buttonSize()).forGetter(TouchConfig::buttonSize),
 			TouchMode.CODEC.lenientOptionalFieldOf("mode", DEFAULT.mode()).forGetter(TouchConfig::mode),
 			TouchControls.CODEC.lenientOptionalFieldOf("controls", DEFAULT.controls()).forGetter(TouchConfig::controls),
-			Codec.INT.optionalFieldOf("camera_sensitivity", DEFAULT.cameraSensitivity()).forGetter(TouchConfig::cameraSensitivity)
+			Codec.INT.optionalFieldOf("camera_sensitivity", DEFAULT.cameraSensitivity()).forGetter(TouchConfig::cameraSensitivity),
+			Codec.BOOL.optionalFieldOf("auto_jump", DEFAULT.autoJump()).forGetter(TouchConfig::autoJump)
 	).apply(instance, TouchConfig::new));
 }

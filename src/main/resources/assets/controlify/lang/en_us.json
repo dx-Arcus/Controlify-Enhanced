@@ -997,5 +997,7 @@
   "controlify.touch.controls.on": "On",
   "controlify.touch.controls.off": "Off",
   "controlify.touch.camera_sensitivity": "Camera Sensitivity",
-  "controlify.touch.camera_sensitivity.tooltip": "How fast the camera turns as you swipe to look around. At 50, a swipe across the whole screen turns you all the way round; higher is faster, lower slower."
+  "controlify.touch.camera_sensitivity.tooltip": "How fast the camera turns as you swipe to look around. At 50, a swipe across the whole screen turns you all the way round; higher is faster, lower slower.",
+  "controlify.touch.auto_jump": "Auto Jump",
+  "controlify.touch.auto_jump.tooltip": "While the touch controls are on, walking into a single block jumps up it. The keyboard's and each controller's own Auto Jump are left as they are."
 }

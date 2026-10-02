@@ -19,6 +19,7 @@ import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.YetAnotherConfigLib;
+import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import net.minecraft.client.gui.screens.Screen;
@@ -26,8 +27,8 @@ import net.minecraft.network.chat.Component;
 
 /**
  * The touch controls' own settings screen (tl122), opened from Global Settings, after Bedrock's Touch settings page:
- * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, and how fast a
- * swipe turns the camera (tl123).
+ * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, how fast a
+ * swipe turns the camera (tl123), and auto jump (tl124).
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -76,6 +77,12 @@ public final class TouchSettingsScreenFactory {
 								.controller(option -> IntegerSliderControllerBuilder.create(option)
 										.range(TouchConfig.MIN_SENSITIVITY, TouchConfig.MAX_SENSITIVITY)
 										.step(1))
+								.build())
+						.option(Option.<Boolean>createBuilder()
+								.name(Component.translatable("controlify.touch.auto_jump"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.auto_jump.tooltip")))
+								.binding(defaults.autoJump, () -> touch.autoJump, value -> touch.autoJump = value)
+								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
 								.build())
 						.build())
 				.build().generateScreen(parent);

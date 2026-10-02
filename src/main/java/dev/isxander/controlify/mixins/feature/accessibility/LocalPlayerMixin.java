@@ -8,6 +8,7 @@ package dev.isxander.controlify.mixins.feature.accessibility;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import dev.isxander.controlify.api.ControlifyApi;
+import dev.isxander.controlify.touch.TouchPad;
 import net.minecraft.client.player.LocalPlayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +17,10 @@ import org.spongepowered.asm.mixin.injection.At;
 public class LocalPlayerMixin {
 	@ModifyExpressionValue(method = "sendPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/OptionInstance;get()Ljava/lang/Object;"))
 	private Object shouldUseAutoJump(Object keyboardAutoJump) {
+		// While the touch controls are on, their own Auto Jump (tl124), as Bedrock keeps one for touch.
+		if (TouchPad.active()) {
+			return TouchPad.autoJump();
+		}
 		if (ControlifyApi.get().currentInputMode().isController()) {
 			return ControlifyApi.get().getCurrentController()
 					.map(controller -> controller.settings().generic.autoJump)

@@ -463,6 +463,16 @@ public final class TouchPad {
 		return config == null ? TouchControls.AUTOMATIC : config.getSettings().touchSettings().controls;
 	}
 
+	/**
+	 * Whether walking into a single block jumps up it while the touch controls are on (tl124): the touch settings' own
+	 * Auto Jump, as Bedrock keeps one for touch, or on before there is a config to read it from. The game asks it in
+	 * {@code LocalPlayer.sendPosition}, through the accessibility {@code LocalPlayerMixin}.
+	 */
+	public static boolean autoJump() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TouchConfig.DEFAULT.autoJump() : config.getSettings().touchSettings().autoJump;
+	}
+
 	/** The player's camera sensitivity (tl123), or the middle before there is a config to read it from. */
 	static int cameraSensitivity() {
 		ConfigManager config = Controlify.instance().config();
