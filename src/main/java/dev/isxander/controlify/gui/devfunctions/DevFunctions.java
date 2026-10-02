@@ -15,6 +15,7 @@ import dev.isxander.controlify.config.settings.GlobalSettings;
 import dev.isxander.controlify.config.settings.TargetLockSettings;
 import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
+import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchDebugOverlay;
 import dev.isxander.controlify.touch.TouchInput;
 import dev.isxander.controlify.touch.TouchMode;
@@ -111,7 +112,7 @@ public final class DevFunctions {
 		button("controlify.gui.dev_functions.controller_connection", ALWAYS, DevFunctions::showConnectionToast);
 		button("controlify.gui.dev_functions.forget_connections", ALWAYS, DevFunctions::forgetConnections);
 		if (TouchInput.SUPPORTED) {
-			button("controlify.gui.dev_functions.touch_controls", ALWAYS, DevFunctions::toggleTouchControls);
+			button("controlify.gui.dev_functions.touch_controls", ALWAYS, DevFunctions::nextTouchControls);
 			button("controlify.gui.dev_functions.touch_mode", ALWAYS, DevFunctions::nextTouchMode);
 			button("controlify.gui.dev_functions.touch_mouse_as_finger", ALWAYS, DevFunctions::toggleMouseAsFinger);
 			button("controlify.gui.dev_functions.touch_show_fingers", ALWAYS, DevFunctions::toggleShowFingers);
@@ -431,12 +432,25 @@ public final class DevFunctions {
 		return learnable(List.of(stored.split(DevConfig.PATH_SEPARATOR)));
 	}
 
-	/** Flips touch controls - the pad and the look under the fingers (tl111, {@link TouchPad}) - and says which way it went. */
-	private static void toggleTouchControls() {
-		boolean on = !TouchPad.active();
-		TouchPad.setActive(on);
+	/**
+	 * Moves the touch controls - the pad and the look under the fingers (tl111, {@link TouchPad}) - on to when they are
+	 * next on (tl120, {@link TouchControls}): by themselves, always, never, round again. Saves it and says which, and
+	 * acts on it at once: always brings them on, never takes them off, and by themselves leaves them as they are until
+	 * the player next touches the screen or picks up the mouse, keyboard or a controller.
+	 */
+	private static void nextTouchControls() {
+		TouchSettings touch = Controlify.instance().config().getSettings().touchSettings();
+		TouchControls[] all = TouchControls.values();
+		touch.controls = all[(touch.controls.ordinal() + 1) % all.length];
+		Controlify.instance().config().saveSafely();
+		if (touch.controls == TouchControls.ON) {
+			TouchPad.setActive(true);
+		} else if (touch.controls == TouchControls.OFF) {
+			TouchPad.setActive(false);
+		}
+		boolean refused = touch.controls == TouchControls.ON && !TouchPad.active();
 		MinecraftUtil.sendToast(Component.translatable("controlify.toast.touch.controls"),
-				Component.translatable(TouchPad.active() == on ? (on ? "options.on" : "options.off") : "controlify.toast.touch.controls.refused"), false);
+				refused ? Component.translatable("controlify.toast.touch.controls.refused") : touch.controls.getDisplayName(), false);
 	}
 
 	/**

@@ -8,18 +8,20 @@ package dev.isxander.controlify.config.dto;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
 
 /**
  * The touch controls' settings, as saved: their layout (tl117) - how far the stick's resting place and the five action
  * buttons are moved from where they sit by default, as fractions of the window's height, right and down positive, and
- * how big each is, as a fraction of its default size, set in the glyph editor's Touch tab - and the mode they play in
- * (tl118, {@code mode}: {@code crosshair} or {@code tap}).
+ * how big each is, as a fraction of its default size, set in the glyph editor's Touch tab - the mode they play in
+ * (tl118, {@code mode}: {@code crosshair} or {@code tap}), and when they are on (tl120, {@code controls}:
+ * {@code automatic}, {@code on} or {@code off}).
  * <p>
  * Every key has a default and is left out of the file while it holds it, so a config saved before either loads as it
  * was. Out-of-range sizes are not refused here - a hand-edited file must not lose every other setting for one bad
- * number - but clamped when read ({@code TouchSettings.fromDTO}); a mode this build does not know - one a later build
- * wrote, or a typing slip - is read as the default, for the same reason.
+ * number - but clamped when read ({@code TouchSettings.fromDTO}); a mode or a setting for when they are on that this
+ * build does not know - one a later build wrote, or a typing slip - is read as the default, for the same reason.
  */
 public record TouchConfig(
 		float stickOffsetX,
@@ -28,17 +30,24 @@ public record TouchConfig(
 		float buttonsOffsetX,
 		float buttonsOffsetY,
 		float buttonSize,
-		TouchMode mode
+		TouchMode mode,
+		TouchControls controls
 ) {
 	/** The smallest and largest size either may be set to: half and twice its default. */
 	public static final float MIN_SIZE = 0.5f;
 	public static final float MAX_SIZE = 2f;
 
-	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR);
+	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC);
 
-	/** A layout in the mode every build before tl118 played: aim crosshair. */
+	/** A layout in the mode every build before tl118 played: aim crosshair; on by themselves, as tl120 has them. */
 	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
 		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, TouchMode.CROSSHAIR);
+	}
+
+	/** A layout and a mode, on by themselves (tl120). */
+	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize,
+			TouchMode mode) {
+		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, TouchControls.AUTOMATIC);
 	}
 
 	public static final Codec<TouchConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -48,6 +57,7 @@ public record TouchConfig(
 			Codec.FLOAT.optionalFieldOf("buttons_offset_x", DEFAULT.buttonsOffsetX()).forGetter(TouchConfig::buttonsOffsetX),
 			Codec.FLOAT.optionalFieldOf("buttons_offset_y", DEFAULT.buttonsOffsetY()).forGetter(TouchConfig::buttonsOffsetY),
 			Codec.FLOAT.optionalFieldOf("button_size", DEFAULT.buttonSize()).forGetter(TouchConfig::buttonSize),
-			TouchMode.CODEC.lenientOptionalFieldOf("mode", DEFAULT.mode()).forGetter(TouchConfig::mode)
+			TouchMode.CODEC.lenientOptionalFieldOf("mode", DEFAULT.mode()).forGetter(TouchConfig::mode),
+			TouchControls.CODEC.lenientOptionalFieldOf("controls", DEFAULT.controls()).forGetter(TouchConfig::controls)
 	).apply(instance, TouchConfig::new));
 }

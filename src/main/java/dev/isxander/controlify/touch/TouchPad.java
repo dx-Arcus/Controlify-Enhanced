@@ -71,10 +71,15 @@ import java.util.Set;
  * TouchInput#mouseAsFinger}) is the cursor set free, because SDL makes finger motion out of the mouse
  * only while the cursor is free; the game's grabs are refused for as long as that lasts. On a screen the
  * pad lets go, the screens' controller glyphs are not drawn, and a close button stands in for Esc
- * ({@link #renderScreen}, {@link #closeTapped}, tl116). Switched by the Dev Functions panel's Touch
- * Controls for now, and not saved. Where the stick rests and the buttons sit, and how big each is, the
- * player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117); so is the mode,
- * switched for now by the panel's Touch Mode (tl118).
+ * ({@link #renderScreen}, {@link #closeTapped}, tl116). Where the stick rests and the buttons sit, and how
+ * big each is, the player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117); so
+ * is the mode, switched for now by the panel's Touch Mode (tl118).
+ *
+ * <p>On by themselves (tl120, {@link TouchControls}): at the first finger on a touchscreen, which does nothing
+ * else, and off again at a click or scroll of the mouse, a key pressed in the world or a controller's input - or
+ * always on, or never, as the Dev Functions panel's Touch Controls sets it, saved. While they are off but would
+ * come on at a touch, SDL's touch-makes-a-mouse hint is off in the world as well, so that touch is not also a
+ * click there; on a screen a tap still clicks, as ever.
  */
 public final class TouchPad {
 	/** How far from the left edge, as a fraction of the window's width, a finger landing becomes the stick - as does one landing on its ring where it rests ({@link #onRest}). */
@@ -119,6 +124,8 @@ public final class TouchPad {
 	static final float HOLD_RING_RADIUS = 0.05f;
 
 	private static boolean active;
+	/** Whether the pad could not be attached when the touch controls last tried to come on: tried again only when asked, or at a touch. */
+	private static boolean refused;
 	private static @Nullable SdlJoystickId padId;
 	private static @Nullable SdlJoystickHandle pad;
 
@@ -257,9 +264,12 @@ public final class TouchPad {
 		}
 		if (on) {
 			if (pad == null && !attach()) {
+				refused = true;
 				return;
 			}
+			refused = false;
 			active = true;
+			TouchInput.setInWorld(TouchPad::inWorld);
 			CUtil.LOGGER.log("Touch controls on");
 		} else {
 			active = false;
@@ -328,7 +338,24 @@ public final class TouchPad {
 	 * into the stick, the look and the buttons, and a tapped hotbar slot selected.
 	 */
 	public static void frame() {
+		TouchControls controls = controls();
+		boolean touched = TouchInput.takeTouchscreen();
+		boolean mouse = TouchInput.takeMouse();
+		boolean key = TouchInput.takeKey();
+		boolean pad = active && controls == TouchControls.AUTOMATIC && otherControllerUsed();
+		Boolean change = turn(controls, active, touched, mouse, key, pad);
+		if (Boolean.TRUE.equals(change) && (touched || !refused)) {
+			setActive(true);
+			if (active && touched) {
+				// The touch that brought them on does only that: its finger is nobody's until it lifts.
+				heldOver(TouchInput.fingers());
+			}
+		} else if (Boolean.FALSE.equals(change)) {
+			setActive(false);
+		}
 		if (!active) {
+			// Off, and to come on at a touch: in the world that touch must not be a click as well.
+			hint(controls != TouchControls.OFF && MinecraftUtil.getScreen() == null ? "0" : "1");
 			return;
 		}
 		Minecraft minecraft = Minecraft.getInstance();
@@ -385,6 +412,52 @@ public final class TouchPad {
 	static Layout layout() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? Layout.DEFAULT : Layout.of(config.getSettings().touchSettings());
+	}
+
+	/**
+	 * What the touch controls do this frame (tl120), as {@link TouchControls} says: {@code true} to come on, {@code false}
+	 * to go off, {@code null} to stay as they are. On by themselves, a finger on a touchscreen brings them on; a click
+	 * or scroll of the mouse, a key pressed in the world or another controller's input - and no touch with it - takes
+	 * them off.
+	 *
+	 * @param touched whether a finger landed on a touchscreen since the last frame
+	 * @param mouse   whether the mouse was clicked or scrolled since the last frame
+	 * @param key     whether a key was pressed in the world since the last frame
+	 * @param pad     whether a controller other than the pad is giving input
+	 */
+	static @Nullable Boolean turn(TouchControls controls, boolean active, boolean touched, boolean mouse, boolean key, boolean pad) {
+		return switch (controls) {
+			case ON -> active ? null : Boolean.TRUE;
+			case OFF -> active ? Boolean.FALSE : null;
+			case AUTOMATIC -> {
+				if (!active) {
+					yield touched ? Boolean.TRUE : null;
+				}
+				yield !touched && (mouse || key || pad) ? Boolean.FALSE : null;
+			}
+		};
+	}
+
+	/** Whether a controller other than the pad is giving input: the player has picked one up. */
+	private static boolean otherControllerUsed() {
+		ControllerEntity mine = entity();
+		return Controlify.instance().getControllerManager()
+				.map(manager -> manager.getConnectedControllers().stream()
+						.anyMatch(controller -> controller != mine
+								&& controller.input().map(input -> input.stateNow().isGivingInput()).orElse(false)))
+				.orElse(false);
+	}
+
+	/** Whether the player is in the world with no screen up, where a key pressed is play (tl120). */
+	private static boolean inWorld() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return minecraft != null && minecraft.player != null && MinecraftUtil.getScreen() == null;
+	}
+
+	/** When the touch controls are on (tl120), or by themselves before there is a config to read it from. */
+	static TouchControls controls() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TouchControls.AUTOMATIC : config.getSettings().touchSettings().controls;
 	}
 
 	/** The mode the player chose (tl118), or aim crosshair before there is a config to read it from. */
