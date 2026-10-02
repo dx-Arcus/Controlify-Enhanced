@@ -21,8 +21,8 @@ import java.util.Optional;
  * fields below and the tap schemes' in their own - edited in the glyph editor's Touch tab, the mode (tl118),
  * when they are on (tl120), joystick visibility (tl131), the camera sensitivity (tl123), invert Y (tl130), the spyglass
  * damping (tl127), the perspective button and easy sprint (tl131), auto jump (tl124), the Pick Block button (tl128)
- * which side of the hotbar the inventory button is on (tl133) and how big the top row is (tl135), set in the touch
- * settings screen - all read every frame by the touch controls.
+ * which side of the hotbar the inventory button is on (tl133), how big the top row is (tl135) and the block outline
+ * (tl136), set in the touch settings screen - all read every frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */
@@ -56,6 +56,8 @@ public class TouchSettings {
 	public boolean leftHandedInventory;
 	/** How big chat, pause and the camera perspective button are (tl135). */
 	public TopButtonSize topButtonSize;
+	/** Whether the block outline is our light grey one in Joystick &amp; Aim Crosshair mode (tl136). */
+	public boolean outlineSelection;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY,
 			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping,
@@ -81,6 +83,7 @@ public class TouchSettings {
 		this.easySprint = options.easySprint();
 		this.leftHandedInventory = options.leftHandedInventory();
 		this.topButtonSize = options.topButtonSize() == null ? TopButtonSize.SMALL : options.topButtonSize();
+		this.outlineSelection = options.outlineSelection();
 	}
 
 	/** A layout as read: offsets that are not numbers at all none, sizes within what the Touch tab offers. */
@@ -134,7 +137,7 @@ public class TouchSettings {
 		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls,
 				cameraSensitivity, autoJump, spyglassDamping, pickBlock, own(tapLayout), own(dpadLayout),
 				new TouchConfig.Options(invertY, joystickVisibility, perspectiveButton, easySprint, leftHandedInventory,
-						topButtonSize));
+						topButtonSize, outlineSelection));
 	}
 
 	/** A tap scheme's layout to save: none while it is aim crosshair's, which a missing one reads as. */

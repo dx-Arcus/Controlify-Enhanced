@@ -110,6 +110,7 @@
     "feature.targetlock.LevelRendererMixin",
     "feature.targetlock.MultiPlayerGameModeMixin",
     "feature.touch.HudMixin",
+    "feature.touch.LevelRendererMixin",
     "feature.touch.LocalPlayerMixin",
     "feature.ui.AbstractSelectionListAccessor",
     "feature.util.ConnectScreenMixin",

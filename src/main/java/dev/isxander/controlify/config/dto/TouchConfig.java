@@ -152,12 +152,13 @@ public record TouchConfig(
 	 * {@code always_visible}, {@code always_hidden} or {@code hidden_when_unused}; a name this build does not know reads
 	 * as always visible), {@code perspective_button} (tl131, off), {@code easy_sprint} (tl131, on - the stick sprints
 	 * past its rim as it has since tl111), {@code left_handed_inventory} (tl133, off) and {@code top_button_size} (tl135,
-	 * {@code small}, {@code medium} or {@code big}; a name this build does not know reads as small). Each left out while
-	 * it holds its default.
+	 * {@code small}, {@code medium} or {@code big}; a name this build does not know reads as small) and
+	 * {@code outline_selection} (tl136, off). Each left out while it holds its default.
 	 */
 	public record Options(boolean invertY, JoystickVisibility joystickVisibility, boolean perspectiveButton, boolean easySprint,
-			boolean leftHandedInventory, TopButtonSize topButtonSize) {
-		public static final Options DEFAULT = new Options(false, JoystickVisibility.ALWAYS_VISIBLE, false, true, false, TopButtonSize.SMALL);
+			boolean leftHandedInventory, TopButtonSize topButtonSize, boolean outlineSelection) {
+		public static final Options DEFAULT = new Options(false, JoystickVisibility.ALWAYS_VISIBLE, false, true, false, TopButtonSize.SMALL,
+				false);
 
 		public static final MapCodec<Options> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
 				Codec.BOOL.optionalFieldOf("invert_y", DEFAULT.invertY()).forGetter(Options::invertY),
@@ -165,7 +166,8 @@ public record TouchConfig(
 				Codec.BOOL.optionalFieldOf("perspective_button", DEFAULT.perspectiveButton()).forGetter(Options::perspectiveButton),
 				Codec.BOOL.optionalFieldOf("easy_sprint", DEFAULT.easySprint()).forGetter(Options::easySprint),
 				Codec.BOOL.optionalFieldOf("left_handed_inventory", DEFAULT.leftHandedInventory()).forGetter(Options::leftHandedInventory),
-				TopButtonSize.CODEC.lenientOptionalFieldOf("top_button_size", DEFAULT.topButtonSize()).forGetter(Options::topButtonSize)
+				TopButtonSize.CODEC.lenientOptionalFieldOf("top_button_size", DEFAULT.topButtonSize()).forGetter(Options::topButtonSize),
+				Codec.BOOL.optionalFieldOf("outline_selection", DEFAULT.outlineSelection()).forGetter(Options::outlineSelection)
 		).apply(instance, Options::new));
 	}
 }

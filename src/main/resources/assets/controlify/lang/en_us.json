@@ -1020,5 +1020,7 @@
   "controlify.touch.top_button_size.tooltip": "How big the buttons along the top of the screen are: chat, pause and the camera perspective button.",
   "controlify.touch.top_button_size.small": "Small",
   "controlify.touch.top_button_size.medium": "Medium",
-  "controlify.touch.top_button_size.big": "Big"
+  "controlify.touch.top_button_size.big": "Big",
+  "controlify.touch.outline_selection": "Outline Selection",
+  "controlify.touch.outline_selection.tooltip": "Draws the outline of the block you are aiming at in a light grey, a little thicker, so it is easier to see which block is targeted. Joystick & Aim Crosshair mode only. The game's own High Contrast Block Outlines, in Accessibility Settings, takes its place when on."
 }

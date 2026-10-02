@@ -32,7 +32,8 @@ import net.minecraft.network.chat.Component;
  * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, how fast a
  * swipe turns the camera (tl123), whether up is down (tl130), how much it slows through a spyglass (tl127), the Pick
  * Block button (tl128), auto jump (tl124), when the joystick shows, the perspective button and easy sprint (tl131),
- * which side of the hotbar the inventory button is on (tl133) and how big the top row is (tl135), in Bedrock's order.
+ * which side of the hotbar the inventory button is on (tl133), how big the top row is (tl135) and the block outline
+ * (tl136), in Bedrock's order.
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -137,6 +138,12 @@ public final class TouchSettingsScreenFactory {
 								.description(OptionDescription.of(Component.translatable("controlify.touch.top_button_size.tooltip")))
 								.binding(defaults.topButtonSize, () -> touch.topButtonSize, value -> touch.topButtonSize = value)
 								.controller(option -> EnumControllerBuilder.create(option).enumClass(TopButtonSize.class))
+								.build())
+						.option(Option.<Boolean>createBuilder()
+								.name(Component.translatable("controlify.touch.outline_selection"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.outline_selection.tooltip")))
+								.binding(defaults.outlineSelection, () -> touch.outlineSelection, value -> touch.outlineSelection = value)
+								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
 								.build())
 						.build())
 				.build().generateScreen(parent);

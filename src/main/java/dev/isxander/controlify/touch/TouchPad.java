@@ -575,6 +575,35 @@ public final class TouchPad {
 		return mainArm == HumanoidArm.RIGHT ? offhandHeld : attackIndicatorOnHotbar;
 	}
 
+	/**
+	 * Outline Selection's line (tl136; Donny, 2 Oct 04:43: "a white-ish grey while still adding some visibility, but it
+	 * shouldn't be too distracting"): a light grey at three quarters opacity, where the game's is black at two fifths -
+	 * not its High Contrast Block Outlines' bright blue - and twice the game's width, near Bedrock's (9 to 10 pixels on
+	 * a 3088x1440 phone, measured on his screenshots, to the game's 4 there).
+	 */
+	public static final int OUTLINE_SELECTION_COLOR = 0xBFC8C8C8;
+	public static final float OUTLINE_SELECTION_WIDTH = 2f;
+
+	/**
+	 * Whether the block outline is Outline Selection's (tl136): the touch controls on, in Joystick &amp; Aim Crosshair -
+	 * the one mode Bedrock offers it in - with the setting on, and the game's own High Contrast Block Outlines off,
+	 * which is left to draw as it does.
+	 */
+	public static boolean outlineSelection(boolean highContrast) {
+		return outlineSelection(active, mode(), outlineSelectionSetting(), highContrast);
+	}
+
+	/** {@link #outlineSelection(boolean)}, from what it reads - for tests. */
+	static boolean outlineSelection(boolean on, TouchMode mode, boolean setting, boolean highContrast) {
+		return on && setting && !highContrast && mode == TouchMode.CROSSHAIR;
+	}
+
+	/** The Outline Selection setting (tl136), or off before there is a config to read it from, as by default. */
+	static boolean outlineSelectionSetting() {
+		ConfigManager config = Controlify.instance().config();
+		return config != null && config.getSettings().touchSettings().outlineSelection;
+	}
+
 	/** How big the top row is (tl135), or Small before there is a config to read it from, as by default. */
 	static TopButtonSize topButtonSize() {
 		ConfigManager config = Controlify.instance().config();
