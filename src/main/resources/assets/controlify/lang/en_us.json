@@ -966,5 +966,22 @@
   "controlify.toast.touch.mode": "Touch Mode",
   "controlify.touch.mode": "Touch Mode",
   "controlify.touch.mode.crosshair": "Joystick & Aim Crosshair",
-  "controlify.touch.mode.tap": "Joystick & Tap to Interact"
+  "controlify.touch.mode.tap": "Joystick & Tap to Interact",
+  "controlify.touch.interact.name": "Name",
+  "controlify.touch.interact.spawn_baby": "Spawn Baby",
+  "controlify.touch.interact.unleash": "Unleash",
+  "controlify.touch.interact.leash": "Leash",
+  "controlify.touch.interact.shear": "Shear",
+  "controlify.touch.interact.trade": "Trade",
+  "controlify.touch.interact.milk": "Milk",
+  "controlify.touch.interact.feed": "Feed",
+  "controlify.touch.interact.tame": "Tame",
+  "controlify.touch.interact.sit": "Sit",
+  "controlify.touch.interact.stand": "Stand",
+  "controlify.touch.interact.dye": "Dye",
+  "controlify.touch.interact.saddle": "Saddle",
+  "controlify.touch.interact.equip": "Equip",
+  "controlify.touch.interact.mount": "Mount",
+  "controlify.touch.interact.ride": "Ride",
+  "controlify.touch.interact.open": "Open"
 }

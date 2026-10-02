@@ -275,11 +275,15 @@ public final class TouchTap {
 	}
 
 	/**
-	 * Where the game acts, as fractions of the window, across then down: a tap's point while its press lasts - first,
-	 * so a finger landing in that time cannot take the press somewhere else - else the finger while one is down; null
-	 * for nowhere.
+	 * Where the game acts, as fractions of the window, across then down: the middle of the screen while the interact
+	 * button pulls use, so it acts on the mob it names (tl119, {@link TouchInteract}); a tap's point while its press
+	 * lasts - before the finger, so a finger landing in that time cannot take the press somewhere else - else the
+	 * finger while one is down; null for nowhere.
 	 */
 	static float[] aim() {
+		if (TouchInteract.pressed()) {
+			return TouchInteract.centre();
+		}
 		if (pressing) {
 			return new float[] {pressX, pressY};
 		}

@@ -46,7 +46,9 @@ import java.util.Set;
  * right, Bedrock's "Joystick & Aim Crosshair" scheme; its buttons and the hotbar are {@link TouchButtons}
  * (tl112), offered every finger first. In tap mode (tl118, {@link TouchMode}), Bedrock's "Joystick &amp; Tap
  * to Interact": no crosshair, the stick taking only a finger that lands on its ring, and a finger on the
- * world tapping, holding or looking ({@link TouchTap}), with a ring round a finger held there.
+ * world tapping, holding or looking ({@link TouchTap}), with a ring round a finger held there. In either, the
+ * interact button over the hotbar while what is in front of the player can be traded with, ridden, sheared and
+ * the like ({@link TouchInteract}, tl119), offered every finger before the buttons.
  *
  * <p>The stick is a real controller as far as the rest of the mod is concerned: a virtual gamepad
  * attached to Controlify's own SDL - the one its controllers come from, not the game's - of the
@@ -185,10 +187,11 @@ public final class TouchPad {
 	/**
 	 * The window a frame of fingers is read against: its size in pixels and in GUI pixels, the GUI scale,
 	 * whether the hotbar is there to tap (no spectators), where the inventory slot after it is, whether the
-	 * player is flying (jump and sneak show up and down), the time, the player's layout, and the mode they
-	 * play in (tl118).
+	 * player is flying (jump and sneak show up and down), the time, the player's layout, the mode they
+	 * play in (tl118), and the interact button if there is one this frame (tl119).
 	 */
-	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode) {
+	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode,
+			TouchInteract.@Nullable Shown interact) {
 		/** The same window with the default layout. */
 		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos) {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, Layout.DEFAULT);
@@ -197,6 +200,11 @@ public final class TouchPad {
 		/** The same window with this layout, in the mode every build before tl118 played. */
 		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout) {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, TouchMode.CROSSHAIR);
+		}
+
+		/** The same window in this mode, with no interact button, as every build before tl119 had. */
+		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode) {
+			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, mode, null);
 		}
 
 		/** Whether a tap on the world uses and attacks, and a hold breaks (tl118). */
@@ -335,9 +343,12 @@ public final class TouchPad {
 
 		if (screen || minecraft.player == null) {
 			letGo();
+			TouchInteract.clear();
 			heldOver(TouchInput.fingers());
 			return;
 		}
+		Window window = minecraft.getWindow();
+		TouchInteract.frame(minecraft, mode(), window.getGuiScaledWidth(), window.getGuiScaledHeight());
 		TouchTap.breakProgress(minecraft.gameMode != null && minecraft.gameMode.isDestroying()
 				? (minecraft.gameMode.getDestroyStage() + 1) / 10f : 0f);
 		Turn turn = readFingers(TouchInput.fingers(), view(minecraft));
@@ -367,7 +378,7 @@ public final class TouchPad {
 		boolean flying = player != null && player.getAbilities().flying;
 		int guiWidth = window.getGuiScaledWidth();
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, mode());
+				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, mode(), TouchInteract.shown());
 	}
 
 	/** The layout the player saved, or the default before there is a config to read it from. */
@@ -423,7 +434,8 @@ public final class TouchPad {
 	 * a finger that lands on the world is offered to {@link TouchTap} first, to tap or hold - which hands it back as
 	 * the look if it moves, or once its hold is done - and only one landing while that one is down is the look at
 	 * once; a finger holding to use turns the camera while no finger is the look and none is dragged from a button;
-	 * and the triggers are pulled by the taps and holds as well.
+	 * and the triggers are pulled by the taps and holds as well. In either mode the interact button, while the view
+	 * has one, is offered each new finger before the buttons, and pulls use while it is held (tl119).
 	 */
 	static Turn readFingers(List<TouchInput.Finger> fingers, View view, TouchTap.Target target) {
 		float aspect = view.aspect();
@@ -449,11 +461,11 @@ public final class TouchPad {
 		for (TouchInput.Finger finger : fingers) {
 			FingerKey key = FingerKey.of(finger);
 			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)
-					|| TouchTap.owns(key)) {
+					|| TouchTap.owns(key) || TouchInteract.owns(key)) {
 				continue;
 			}
 			boolean landed = !seen.contains(key);
-			if (landed && TouchButtons.claim(finger, view)) {
+			if (landed && (TouchInteract.claim(finger, view) || TouchButtons.claim(finger, view))) {
 				continue;
 			}
 			if (stick == null && (view.tap() ? onRest(finger, view) : (finger.x() < STICK_ZONE || onRest(finger, view)))) {
@@ -489,6 +501,7 @@ public final class TouchPad {
 		float[] drag = TouchButtons.update(fingers, view);
 		long now = view.nanos();
 		boolean useHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, now);
+		useHeld |= TouchInteract.update(fingers, view);
 		boolean attackHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, now);
 		if (view.tap()) {
 			TouchTap.update(fingers, view, target);
@@ -609,6 +622,7 @@ public final class TouchPad {
 		writeStick(0f, 0f, false);
 		TouchButtons.letGo();
 		TouchTap.letGo();
+		TouchInteract.letGo();
 		writeButtons(0);
 		writeTriggers(false, false);
 	}
@@ -720,6 +734,10 @@ public final class TouchPad {
 	static void draw(GuiGraphicsExtractor graphics, View view) {
 		drawStick(graphics, view);
 		TouchButtons.render(graphics, view, false);
+		if (view.interact() != null) {
+			Minecraft minecraft = Minecraft.getInstance();
+			TouchInteract.draw(graphics, minecraft == null ? null : minecraft.font, view.interact(), TouchInteract.pressed());
+		}
 		float[] ring = view.tap() ? TouchTap.ring() : null;
 		if (ring != null) {
 			int width = graphics.guiWidth();
@@ -868,6 +886,8 @@ public final class TouchPad {
 		SEEN.clear();
 		TouchButtons.letGo();
 		TouchTap.letGo();
+		TouchInteract.letGo();
+		TouchInteract.clear();
 	}
 
 	/** For tests: the pad's buttons and triggers as last written. */
