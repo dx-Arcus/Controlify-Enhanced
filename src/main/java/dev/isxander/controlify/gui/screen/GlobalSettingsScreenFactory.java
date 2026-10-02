@@ -15,6 +15,7 @@ import dev.isxander.controlify.driver.steamdeck.SteamDeckUtil;
 import dev.isxander.controlify.reacharound.ReachAroundMode;
 import dev.isxander.controlify.server.ServerPolicies;
 import dev.isxander.controlify.server.ServerPolicy;
+import dev.isxander.controlify.touch.TouchInput;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.DebugDump;
 import dev.isxander.controlify.utils.MinecraftUtil;
@@ -251,6 +252,12 @@ public class GlobalSettingsScreenFactory {
 										.text(Component.translatable("controlify.gui.aim_assist.button"))
 										.description(OptionDescription.of(Component.translatable("controlify.gui.aim_assist.tooltip")))
 										.action((screen, button) -> MinecraftUtil.setScreen(AimAssistScreenFactory.createAimAssistScreen(screen)))
+										.build())
+								.optionIf(TouchInput.SUPPORTED, ButtonOption.createBuilder()
+										.name(Component.translatable("controlify.gui.touch_settings"))
+										.text(Component.translatable("controlify.gui.touch_settings.button"))
+										.description(OptionDescription.of(Component.translatable("controlify.gui.touch_settings.tooltip")))
+										.action((screen, button) -> MinecraftUtil.setScreen(TouchSettingsScreenFactory.createTouchSettingsScreen(screen)))
 										.build())
 								.option(Option.<Boolean>createBuilder()
 										.name(Component.translatable("controlify.gui.ui_sounds"))
