@@ -15,6 +15,7 @@ import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Locale;
 import java.util.function.Predicate;
 
 /**
@@ -35,7 +36,7 @@ public enum AimAssistMode implements NameableEnum, StringRepresentable {
 
 	AimAssistMode(Predicate<Minecraft> canAimAssist) {
 		this.canAimAssist = canAimAssist;
-		this.displayName = Component.translatable("controlify.aim_assist.mode." + this.name().toLowerCase());
+		this.displayName = Component.translatable("controlify.aim_assist.mode." + this.name().toLowerCase(Locale.ROOT));
 	}
 
 	public boolean canAimAssist() {
@@ -64,6 +65,6 @@ public enum AimAssistMode implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }

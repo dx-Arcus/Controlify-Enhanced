@@ -12,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Locale;
+
 /** Which entities aim assist is allowed to pull towards. */
 public enum AimAssistTargets implements NameableEnum, StringRepresentable {
 	/** Monsters, plus anything currently aggressive, so an angry wolf pack counts. */
@@ -24,7 +26,7 @@ public enum AimAssistTargets implements NameableEnum, StringRepresentable {
 	public static final Codec<AimAssistTargets> CODEC = StringRepresentable.fromEnum(AimAssistTargets::values);
 
 	private final Component displayName =
-			Component.translatable("controlify.aim_assist.targets." + this.name().toLowerCase());
+			Component.translatable("controlify.aim_assist.targets." + this.name().toLowerCase(Locale.ROOT));
 
 	@Override
 	public Component getDisplayName() {
@@ -33,6 +35,6 @@ public enum AimAssistTargets implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }

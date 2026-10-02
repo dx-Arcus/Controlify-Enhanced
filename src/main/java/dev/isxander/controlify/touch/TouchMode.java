@@ -12,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Locale;
+
 /**
  * How the touch controls play (tl118): Bedrock's control modes, by its names.
  */
@@ -39,7 +41,7 @@ public enum TouchMode implements NameableEnum, StringRepresentable {
 	private final Component displayName;
 
 	TouchMode() {
-		this.displayName = Component.translatable("controlify.touch.mode." + this.name().toLowerCase());
+		this.displayName = Component.translatable("controlify.touch.mode." + this.name().toLowerCase(Locale.ROOT));
 	}
 
 	@Override
@@ -49,6 +51,6 @@ public enum TouchMode implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }

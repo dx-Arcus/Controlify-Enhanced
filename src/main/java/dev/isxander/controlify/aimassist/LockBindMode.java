@@ -12,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Locale;
+
 /**
  * Which mob the Lock Target bind picks. The bind itself is the same whichever is chosen - tap to
  * lock or move on, hold to let go - and only one is ever in use. Separate from {@link TargetLockMode},
@@ -32,7 +34,7 @@ public enum LockBindMode implements NameableEnum, StringRepresentable {
 	private final Component displayName;
 
 	LockBindMode() {
-		this.displayName = Component.translatable("controlify.target_lock.bind_mode." + this.name().toLowerCase());
+		this.displayName = Component.translatable("controlify.target_lock.bind_mode." + this.name().toLowerCase(Locale.ROOT));
 	}
 
 	@Override
@@ -42,6 +44,6 @@ public enum LockBindMode implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }

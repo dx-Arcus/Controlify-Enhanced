@@ -12,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Locale;
+
 /**
  * Trajectory Aim: whether bow aim assist helps the crosshair onto the mob itself, or onto where a
  * shot has to go to land on it - and if so, for which draw. {@link TrajectoryAim} works it out.
@@ -36,7 +38,7 @@ public enum TrajectoryAimMode implements NameableEnum, StringRepresentable {
 	private final Component displayName;
 
 	TrajectoryAimMode() {
-		this.displayName = Component.translatable("controlify.aim_assist.trajectory_aim." + this.name().toLowerCase());
+		this.displayName = Component.translatable("controlify.aim_assist.trajectory_aim." + this.name().toLowerCase(Locale.ROOT));
 	}
 
 	/** Whether it does anything at all. */
@@ -51,6 +53,6 @@ public enum TrajectoryAimMode implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }

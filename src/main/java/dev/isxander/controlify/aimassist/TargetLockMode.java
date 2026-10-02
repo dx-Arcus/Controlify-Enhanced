@@ -12,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Locale;
+
 /**
  * How a target comes to be locked. Whether target lock runs at all is a separate toggle, so
  * switching it off doesn't lose the mode you picked.
@@ -33,7 +35,7 @@ public enum TargetLockMode implements NameableEnum, StringRepresentable {
 	TargetLockMode(boolean assistsLockedTarget, boolean followsLastHit) {
 		this.assistsLockedTarget = assistsLockedTarget;
 		this.followsLastHit = followsLastHit;
-		this.displayName = Component.translatable("controlify.target_lock.mode." + this.name().toLowerCase());
+		this.displayName = Component.translatable("controlify.target_lock.mode." + this.name().toLowerCase(Locale.ROOT));
 	}
 
 	/** Whether aim assist should act on the locked target, or just leave the marker on it. */
@@ -53,6 +55,6 @@ public enum TargetLockMode implements NameableEnum, StringRepresentable {
 
 	@Override
 	public @NonNull String getSerializedName() {
-		return this.name().toLowerCase();
+		return this.name().toLowerCase(Locale.ROOT);
 	}
 }
