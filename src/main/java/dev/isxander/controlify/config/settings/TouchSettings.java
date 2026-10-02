@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * The touch controls' settings, live: the layout (tl117) - one for each scheme since tl129, aim crosshair's in the six
  * fields below and the tap schemes' in their own - edited in the glyph editor's Touch tab, the mode (tl118),
- * when they are on (tl120), the camera sensitivity (tl123), the spyglass damping (tl127), auto jump (tl124) and the
+ * when they are on (tl120), the camera sensitivity (tl123), invert Y (tl130), the spyglass damping (tl127), auto jump (tl124) and the
  * Pick Block button (tl128), set in the touch settings screen - all read every frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
@@ -42,10 +42,12 @@ public class TouchSettings {
 	/** Joystick &amp; tap to interact's layout and D-pad &amp; tap to interact's (tl129). */
 	public TouchLayoutConfig tapLayout;
 	public TouchLayoutConfig dpadLayout;
+	/** Whether a swipe up looks down and a swipe down up (tl130). */
+	public boolean invertY;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY,
 			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping,
-			boolean pickBlock, Optional<TouchLayoutConfig> tapLayout, Optional<TouchLayoutConfig> dpadLayout) {
+			boolean pickBlock, Optional<TouchLayoutConfig> tapLayout, Optional<TouchLayoutConfig> dpadLayout, TouchConfig.Options options) {
 		this.stickOffsetX = stickOffsetX;
 		this.stickOffsetY = stickOffsetY;
 		this.stickSize = size(stickSize);
@@ -61,6 +63,7 @@ public class TouchSettings {
 		// A tap scheme with no layout of its own has aim crosshair's, as every scheme did before tl129.
 		this.tapLayout = tapLayout.map(TouchSettings::read).orElse(layout(TouchMode.CROSSHAIR));
 		this.dpadLayout = dpadLayout.map(TouchSettings::read).orElse(layout(TouchMode.CROSSHAIR));
+		this.invertY = options.invertY();
 	}
 
 	/** A layout as read: offsets that are not numbers at all none, sizes within what the Touch tab offers. */
@@ -106,12 +109,13 @@ public class TouchSettings {
 	public static TouchSettings fromDTO(TouchConfig dto) {
 		return new TouchSettings(offset(dto.stickOffsetX()), offset(dto.stickOffsetY()), dto.stickSize(),
 				offset(dto.buttonsOffsetX()), offset(dto.buttonsOffsetY()), dto.buttonSize(), dto.mode(), dto.controls(),
-				dto.cameraSensitivity(), dto.autoJump(), dto.spyglassDamping(), dto.pickBlock(), dto.tapLayout(), dto.dpadLayout());
+				dto.cameraSensitivity(), dto.autoJump(), dto.spyglassDamping(), dto.pickBlock(), dto.tapLayout(), dto.dpadLayout(),
+				dto.options());
 	}
 
 	public TouchConfig toDTO() {
 		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls,
-				cameraSensitivity, autoJump, spyglassDamping, pickBlock, own(tapLayout), own(dpadLayout));
+				cameraSensitivity, autoJump, spyglassDamping, pickBlock, own(tapLayout), own(dpadLayout), new TouchConfig.Options(invertY));
 	}
 
 	/** A tap scheme's layout to save: none while it is aim crosshair's, which a missing one reads as. */

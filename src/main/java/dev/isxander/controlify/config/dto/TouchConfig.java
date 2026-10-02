@@ -7,6 +7,7 @@
 package dev.isxander.controlify.config.dto;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
@@ -25,7 +26,8 @@ import java.util.Optional;
  * {@code pick_block}: off by default, as Bedrock's), and the two tap schemes' layouts (tl129, {@code tap} and
  * {@code dpad}, each a {@link TouchLayoutConfig}): the six layout keys above are aim crosshair's. A scheme's section is
  * there only while its layout differs from aim crosshair's, and a section that is not there reads as aim crosshair's
- * layout - so a config saved before tl129, with one layout for every scheme, loads with that layout in each.
+ * layout - so a config saved before tl129, with one layout for every scheme, loads with that layout in each. The
+ * rest of Bedrock's Touch page from tl130 on is {@link Options}, its keys beside the others in the section.
  * <p>
  * Every key has a default and is left out of the file while it holds it, so a config saved before either loads as it
  * was. Out-of-range sizes and sensitivities are not refused here - a hand-edited file must not lose every other setting for one bad
@@ -46,7 +48,8 @@ public record TouchConfig(
 		int spyglassDamping,
 		boolean pickBlock,
 		Optional<TouchLayoutConfig> tapLayout,
-		Optional<TouchLayoutConfig> dpadLayout
+		Optional<TouchLayoutConfig> dpadLayout,
+		Options options
 ) {
 	/** The smallest and largest size either may be set to: half and twice its default. */
 	public static final float MIN_SIZE = 0.5f;
@@ -63,7 +66,7 @@ public record TouchConfig(
 	public static final int DEFAULT_DAMPING = 50;
 
 	public static final TouchConfig DEFAULT = new TouchConfig(0f, 0f, 1f, 0f, 0f, 1f, TouchMode.CROSSHAIR, TouchControls.AUTOMATIC,
-			DEFAULT_SENSITIVITY, true, DEFAULT_DAMPING, false, Optional.empty(), Optional.empty());
+			DEFAULT_SENSITIVITY, true, DEFAULT_DAMPING, false, Optional.empty(), Optional.empty(), Options.DEFAULT);
 
 	/** A layout in the mode every build before tl118 played: aim crosshair; on by themselves, as tl120 has them. */
 	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize) {
@@ -109,6 +112,14 @@ public record TouchConfig(
 				spyglassDamping, pickBlock, Optional.empty(), Optional.empty());
 	}
 
+	/** All but the options of Bedrock's Touch page from tl130 on, which are their defaults. */
+	public TouchConfig(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY, float buttonSize,
+			TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping, boolean pickBlock,
+			Optional<TouchLayoutConfig> tapLayout, Optional<TouchLayoutConfig> dpadLayout) {
+		this(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls, cameraSensitivity, autoJump,
+				spyglassDamping, pickBlock, tapLayout, dpadLayout, Options.DEFAULT);
+	}
+
 	/** Aim crosshair's layout, the six keys at the top of the section. */
 	public TouchLayoutConfig crosshairLayout() {
 		return new TouchLayoutConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize);
@@ -128,6 +139,20 @@ public record TouchConfig(
 			Codec.INT.optionalFieldOf("spyglass_damping", DEFAULT.spyglassDamping()).forGetter(TouchConfig::spyglassDamping),
 			Codec.BOOL.optionalFieldOf("pick_block", DEFAULT.pickBlock()).forGetter(TouchConfig::pickBlock),
 			TouchLayoutConfig.CODEC.optionalFieldOf("tap").forGetter(TouchConfig::tapLayout),
-			TouchLayoutConfig.CODEC.optionalFieldOf("dpad").forGetter(TouchConfig::dpadLayout)
+			TouchLayoutConfig.CODEC.optionalFieldOf("dpad").forGetter(TouchConfig::dpadLayout),
+			Options.MAP_CODEC.forGetter(TouchConfig::options)
 	).apply(instance, TouchConfig::new));
+
+	/**
+	 * The rest of Bedrock's Touch page (tl130 on), read and written as one entry of the codec above - which holds
+	 * sixteen at most, and has fifteen with this - but with its keys at the same level as every other in the section,
+	 * as a map codec's sit: {@code invert_y} (tl130, off by default). Each left out while it holds its default.
+	 */
+	public record Options(boolean invertY) {
+		public static final Options DEFAULT = new Options(false);
+
+		public static final MapCodec<Options> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+				Codec.BOOL.optionalFieldOf("invert_y", DEFAULT.invertY()).forGetter(Options::invertY)
+		).apply(instance, Options::new));
+	}
 }

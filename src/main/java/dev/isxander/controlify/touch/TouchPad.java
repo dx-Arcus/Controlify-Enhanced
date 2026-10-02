@@ -407,7 +407,8 @@ public final class TouchPad {
 			if (minecraft.options.getCameraType().isFirstPerson() && minecraft.player.isScoping()) {
 				units *= spyglassSpeed(spyglassDamping());
 			}
-			minecraft.player.turn(turn.yawDegrees() * units, turn.pitchDegrees() * units);
+			// Invert Y (tl130): a swipe up looks down.
+			minecraft.player.turn(turn.yawDegrees() * units, turn.pitchDegrees() * (invertY() ? -units : units));
 		}
 	}
 
@@ -500,6 +501,12 @@ public final class TouchPad {
 	public static boolean autoJump() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? TouchConfig.DEFAULT.autoJump() : config.getSettings().touchSettings().autoJump;
+	}
+
+	/** Whether a swipe up looks down (tl130), or not before there is a config to read it from, as by default. */
+	static boolean invertY() {
+		ConfigManager config = Controlify.instance().config();
+		return config != null && config.getSettings().touchSettings().invertY;
 	}
 
 	/** Whether the Pick Block button is shown (tl128), or not before there is a config to read it from, as by default. */

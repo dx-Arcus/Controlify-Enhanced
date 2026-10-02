@@ -1002,5 +1002,7 @@
   "controlify.touch.spyglass_damping": "Spyglass Damping",
   "controlify.touch.spyglass_damping.tooltip": "How much the camera slows while you look through a spyglass, so a swipe is easier to aim. 0 does not slow it; 50 slows it to an eighth, as the game slows the mouse; 100 to a sixty-fourth.",
   "controlify.touch.pick_block": "Pick Block",
-  "controlify.touch.pick_block.tooltip": "Shows a button that puts a block you can see in your hand, as the middle mouse button does: in Creative the block itself, in Survival only if you are carrying it. With the crosshair it picks what the crosshair is on. In the tap modes, tap the button, then the block."
+  "controlify.touch.pick_block.tooltip": "Shows a button that puts a block you can see in your hand, as the middle mouse button does: in Creative the block itself, in Survival only if you are carrying it. With the crosshair it picks what the crosshair is on. In the tap modes, tap the button, then the block.",
+  "controlify.touch.invert_y": "Invert Camera Y-Axis",
+  "controlify.touch.invert_y.tooltip": "While the touch controls are on, swiping up looks down and swiping down looks up."
 }
