@@ -12,11 +12,12 @@
 
 ## What's different in this fork
 
-Controller aim assist with target lock, a few quality-of-life changes, and fixes for two annoyances — most of it on Controlify's **Global Settings** screen. Everything else behaves exactly like the official mod.
+Touch controls modelled on Bedrock Edition's, controller aim assist with target lock, a few quality-of-life changes, and fixes for two annoyances — most of it on Controlify's **Global Settings** screen. Everything else behaves exactly like the official mod.
 
 **New options**
 
 - [Aim assist](#aim-assist) — for melee and bows, with [Trajectory Aim](#trajectory-aim), [target lock](#target-lock), [snaps and Swing Timing Assist](#snaps-and-swing-timing-assist), a [compass bar](#compass-bar), [marker and compass colours](#marker-and-compass-colours) and a [custom target list](#custom-target-list). Off by default.
+- [Touch controls](#touch-controls) — play on a touchscreen in [all three of Bedrock's modes](#touch-modes), each with a [layout of your own](#customize-controls). They switch themselves on at a touch.
 - [Edit Glyph Positions](#edit-glyph-positions) — move the in-game button guides out of the way.
 - [Disable Whitelist & Force Analog Movement](#disable-whitelist--force-analog-movement) — analog movement on every server.
 - [Quick move to the off hand](#quick-move-to-the-off-hand) — Y on a totem, rocket, torch and the like puts it in your off hand.
@@ -33,7 +34,7 @@ Controller aim assist with target lock, a few quality-of-life changes, and fixes
 - [Dev Functions panel](#dev-functions-panel) — trigger things on demand.
 
 <p align="center">
-  <img alt="Global Settings with the new options and the Dev Functions panel" src="assets/fork/global-settings.jpg" width="900">
+  <img alt="Global Settings with the new options" src="assets/fork/global-settings.jpg" width="900">
   <br>
   <em>The Global Settings screen in this build.</em>
 </p>
@@ -159,9 +160,71 @@ Set **Target** to **Custom list** and **Open Target List** lets you pick from ev
   <img alt="The Custom Target List picker" src="assets/fork/custom-target-list.jpg" width="900">
 </p>
 
+### Touch controls
+
+On a touchscreen, this build plays with touch controls modelled on Bedrock Edition's: a joystick on the left and a swipe on the right to look around, buttons for jump, sprint, sneak, attack and use, chat and pause along the top, and a tap on the hotbar to pick a slot — a slide along it picks as it goes — with the three dots after it opening your inventory. **Open Touch Controls Menu** in Global Settings opens their screen.
+
+<p align="center">
+  <img alt="Touch controls in Joystick &amp; Aim Crosshair mode" src="assets/fork/touch-in-game.jpg" width="900">
+  <br>
+  <em>Joystick &amp; Aim Crosshair, with Pick Block and the Camera Perspective Button on.</em>
+</p>
+
+**Touch Controls** sets when they're on. **Automatic**, the default, switches them on the moment you touch the screen — that touch does nothing else — and off again when you click or scroll the mouse, press a key in the world, or use a controller; with no touchscreen they never come on. **On** keeps them on, and **Off** keeps them off.
+
+While they're on, a tap on a menu is a click, as before. Any screen Esc would close gets a close button in its top-right corner, and the controller button hints are hidden, since a finger presses none of those buttons.
+
+<p align="center">
+  <img alt="The Touch Controls screen" src="assets/fork/touch-controls-screen.jpg" width="820">
+  <br>
+  <em>The Touch Controls screen.</em>
+</p>
+
+#### Touch modes
+
+**Touch Mode** picks one of Bedrock's three:
+
+- **Joystick & Aim Crosshair** — the joystick appears wherever your thumb lands on the left side of the screen, and swiping on the right turns the camera. Attack and use are buttons, and act on what the crosshair is on; dragging from any of the buttons on the right turns the camera too. The default.
+- **Joystick & Tap to Interact** — no crosshair. Tap a block to use it, tap a mob to attack it, hold on a block to break it — a ring fills as it breaks — and hold with food, a bow, a snowball or anything else you use to use it; drag anywhere to look around. The joystick only takes a thumb that lands on its ring, and jump, sprint and sneak sit a row lower.
+- **D-Pad & Tap to Interact** — the same, with a D-pad in place of the joystick: forward, back and the sides, sneak in the middle, the two diagonals beside forward while it's held, and forward tapped twice to sprint. Jump is alone on the right.
+
+In every mode, a button just above the hotbar names what using the mob or boat in front of you would do — **Trade**, **Feed**, **Tame**, **Ride**, **Milk**, **Shear** and the like — and does it when you tap it. Aim assist and Swing Timing Assist sit out the two tap modes, which have no crosshair to help onto anything.
+
+> [!WARNING]
+> The two tap modes act on whatever is under your finger rather than what you're facing, which anti-cheats that check where you look may flag. The [anti-cheat reminder](#anti-cheat-reminder) names **Touch Mode** while it's set to either of them.
+
+#### Customize Controls
+
+**Customize Controls** opens the **Touch** tab of [Edit Glyph Positions](#edit-glyph-positions), which holds a layout for each mode. Pick the mode along the top, then move the joystick (or the D-pad) and the buttons on the right with the arrows or by typing exact offsets, and size each from 50% to 200%; the preview draws them where the game will. **Done** saves all three layouts, and **Reset All** puts back the one you're editing. Chat and pause stay where they are, sized by **Top Button Size**. It opens while the touch controls are on or a controller is connected.
+
+<p align="center">
+  <img alt="The Touch tab in Joystick &amp; Aim Crosshair" src="assets/fork/touch-tab-crosshair.jpg" width="820">
+  <br>
+  <img alt="The Touch tab in Joystick &amp; Tap to Interact" src="assets/fork/touch-tab-tap.jpg" width="405">
+  <img alt="The Touch tab in D-Pad &amp; Tap to Interact" src="assets/fork/touch-tab-dpad.jpg" width="405">
+  <br>
+  <em>The Touch tab in each mode, each with its own layout: Joystick &amp; Aim Crosshair above, Joystick &amp; Tap to Interact and D-Pad &amp; Tap to Interact below.</em>
+</p>
+
+#### The other settings
+
+- **Left-Handed Inventory Access** — the three dots move to the left of the hotbar.
+- **Joystick Visibility** — **Always Visible**, **Always Hidden**, or **Hidden When Unused**, drawn only while your thumb is on it. It works the same either way.
+- **Invert Camera Y-Axis** — swiping up looks down, and swiping down looks up.
+- **Camera Sensitivity** — how fast a swipe turns the camera. At 50, the default, a swipe across the whole screen turns you all the way round.
+- **Spyglass Damping** — how much a swipe slows while you look through a spyglass. 50, the default, slows it to an eighth, as the game slows the mouse.
+- **Pick Block** — a button that puts a block you can see in your hand, as the middle mouse button does: in Creative the block itself, in Survival only if you're carrying it. In the tap modes, tap the button, then the block. Off by default.
+- **Camera Perspective Button** — a button at the top, beside chat, that switches the camera between first and third person. Off by default.
+- **Auto Jump** — walking into a single block jumps up it. On by default, and separate from the keyboard's and each controller's own Auto Jump.
+- **Easy Sprint** — pushing the joystick past its rim sprints, with no button needed. On by default.
+- **Top Button Size** — **Small**, **Medium** or **Big**, for chat, pause and the perspective button.
+- **Outline Selection** — the outline of the block you're aiming at turns a light grey, a little thicker, so it's easier to see. Joystick & Aim Crosshair only, and off by default.
+
+The touch controls are new in this build, and so far have been tried with simulated touch on Windows rather than on a real touchscreen. **Mouse as Finger** in the [Dev Functions panel](#dev-functions-panel) lets you try them with the mouse.
+
 ### Edit Glyph Positions
 
-Move the left and right in-game button guides separately — nudge them, type exact offsets, snap to a corner, or reset. Handy for keeping them clear of other HUD elements, like beacon effect icons. Requires a connected controller.
+Move the left and right in-game button guides separately on the **Guides** tab — nudge them, type exact offsets, snap to a corner, or reset. Handy for keeping them clear of other HUD elements, like beacon effect icons. The **Touch** tab beside it lays out the [touch controls](#customize-controls). Requires a connected controller, or the touch controls switched on.
 
 <p align="center">
   <img alt="The Edit Glyph Positions editor" src="assets/fork/glyph-editor.jpg" width="820">
@@ -184,7 +247,7 @@ In your own inventory, the quick move button — Y on an Xbox layout — on a to
 
 ### Anti-cheat reminder
 
-The multiplayer screen shows a red line under its title while any setting is on that would run on a server and that anti-cheats kick or ban for — **Aim Assist** on **Everywhere** and whatever runs with it, **Block Reach Around** on **Everywhere**, or **Disable Whitelist & Force Analog Movement** — naming each one, so it can be switched off before you join. With none of them on, nothing shows.
+The multiplayer screen shows a red line under its title while any setting is on that would run on a server and that anti-cheats kick or ban for — **Aim Assist** on **Everywhere** and whatever runs with it, **Block Reach Around** on **Everywhere**, **Disable Whitelist & Force Analog Movement**, or **Touch Mode** on either tap mode — naming each one, so it can be switched off before you join. With none of them on, nothing shows.
 
 ---
 
@@ -212,13 +275,15 @@ Minecraft 26.3 moved its input from GLFW to SDL, and two things in the official 
 
 ### Dev Functions panel
 
-A panel in Global Settings for triggering things on demand while testing: **New Server Toast**, **Check Aim Assist Target**, **Check Target Lock**, **Movement Type** and **Controller Connection**, plus **Marker Floor (blocks)** and **Color pointer speed** to type values into — with a controller, they open a number pad rather than the whole keyboard. The checkbox below it hides it.
+A panel in Global Settings for triggering things on demand while testing: **New Server Toast**, **Check Aim Assist Target**, **Check Target Lock**, **Movement Type**, **Controller Connection**, **Mouse as Finger** and **Show Fingers**, plus **Marker Floor (blocks)** and **Color pointer speed** to type values into — with a controller, they open a number pad rather than the whole keyboard. The checkbox below it hides it.
 
 <p align="center">
   <img alt="The Dev Functions panel" src="assets/fork/dev-functions-panel.png" width="620">
 </p>
 
 **Controller Connection** reports whether the pad is on a cable or a receiver — something the game can't work out by itself, so you teach it once: press **Learn Wired** on a cable and **Learn Wireless** on a receiver. For a few seconds after plugging in or unplugging, both buttons grey out and read **Wait...** until the connection settles. **Clear Learned** starts over.
+
+**Mouse as Finger** makes the mouse stand in for one finger — the left button held down is a finger on the screen — for trying the [touch controls](#touch-controls) without a touchscreen. Set **Touch Controls** to **On** first, since in **Automatic** a click of the mouse switches them off. **Show Fingers** draws every finger the game can see, with a count at the top left.
 
 ---
 
