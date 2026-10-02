@@ -79,7 +79,8 @@ import java.util.Set;
  *
  * <p>On by themselves (tl120, {@link TouchControls}): at the first finger on a touchscreen, which does nothing
  * else, and off again at a click or scroll of the mouse, a key pressed in the world or a controller's input - or
- * always on, or never, as the Dev Functions panel's Touch Controls sets it, saved. While they are off but would
+ * always on, or never, as the touch settings screen's Touch Controls sets it (tl122; the Dev Functions panel's
+ * button for it gone since tl125), saved. While they are off but would
  * come on at a touch, SDL's touch-makes-a-mouse hint is off in the world as well, so that touch is not also a
  * click there; on a screen a tap still clicks, as ever.
  */
