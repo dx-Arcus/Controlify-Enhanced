@@ -10,6 +10,7 @@ import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.ControlifyApi;
 import dev.isxander.controlify.config.dto.TouchConfig;
 import dev.isxander.controlify.config.settings.TouchSettings;
+import dev.isxander.controlify.touch.JoystickVisibility;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
 import dev.isxander.controlify.touch.TouchPad;
@@ -29,7 +30,8 @@ import net.minecraft.network.chat.Component;
  * The touch controls' own settings screen (tl122), opened from Global Settings, after Bedrock's Touch settings page:
  * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, how fast a
  * swipe turns the camera (tl123), whether up is down (tl130), how much it slows through a spyglass (tl127), the Pick
- * Block button (tl128), and auto jump (tl124).
+ * Block button (tl128), auto jump (tl124), and when the joystick shows, the perspective button and easy sprint (tl131),
+ * in Bedrock's order.
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -71,6 +73,12 @@ public final class TouchSettingsScreenFactory {
 										MinecraftUtil.setScreen(new GuideOffsetEditScreen(screen, controller.settings().generic.guide, controller))))
 								.available(ControlifyApi.get().getCurrentController().isPresent())
 								.build())
+						.option(Option.<JoystickVisibility>createBuilder()
+								.name(Component.translatable("controlify.touch.joystick_visibility"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.joystick_visibility.tooltip")))
+								.binding(defaults.joystickVisibility, () -> touch.joystickVisibility, value -> touch.joystickVisibility = value)
+								.controller(option -> EnumControllerBuilder.create(option).enumClass(JoystickVisibility.class))
+								.build())
 						.option(Option.<Boolean>createBuilder()
 								.name(Component.translatable("controlify.touch.invert_y"))
 								.description(OptionDescription.of(Component.translatable("controlify.touch.invert_y.tooltip")))
@@ -100,9 +108,21 @@ public final class TouchSettingsScreenFactory {
 								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
 								.build())
 						.option(Option.<Boolean>createBuilder()
+								.name(Component.translatable("controlify.touch.perspective_button"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.perspective_button.tooltip")))
+								.binding(defaults.perspectiveButton, () -> touch.perspectiveButton, value -> touch.perspectiveButton = value)
+								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
+								.build())
+						.option(Option.<Boolean>createBuilder()
 								.name(Component.translatable("controlify.touch.auto_jump"))
 								.description(OptionDescription.of(Component.translatable("controlify.touch.auto_jump.tooltip")))
 								.binding(defaults.autoJump, () -> touch.autoJump, value -> touch.autoJump = value)
+								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
+								.build())
+						.option(Option.<Boolean>createBuilder()
+								.name(Component.translatable("controlify.touch.easy_sprint"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.easy_sprint.tooltip")))
+								.binding(defaults.easySprint, () -> touch.easySprint, value -> touch.easySprint = value)
 								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
 								.build())
 						.build())

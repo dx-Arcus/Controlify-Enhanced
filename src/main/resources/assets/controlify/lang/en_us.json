@@ -1004,5 +1004,14 @@
   "controlify.touch.pick_block": "Pick Block",
   "controlify.touch.pick_block.tooltip": "Shows a button that puts a block you can see in your hand, as the middle mouse button does: in Creative the block itself, in Survival only if you are carrying it. With the crosshair it picks what the crosshair is on. In the tap modes, tap the button, then the block.",
   "controlify.touch.invert_y": "Invert Camera Y-Axis",
-  "controlify.touch.invert_y.tooltip": "While the touch controls are on, swiping up looks down and swiping down looks up."
+  "controlify.touch.invert_y.tooltip": "While the touch controls are on, swiping up looks down and swiping down looks up.",
+  "controlify.touch.joystick_visibility": "Joystick Visibility",
+  "controlify.touch.joystick_visibility.tooltip": "When the joystick is drawn: always, never, or only while your thumb is on it. It works the same either way. The D-pad is always drawn.",
+  "controlify.touch.joystick_visibility.always_visible": "Always Visible",
+  "controlify.touch.joystick_visibility.always_hidden": "Always Hidden",
+  "controlify.touch.joystick_visibility.hidden_when_unused": "Hidden When Unused",
+  "controlify.touch.perspective_button": "Camera Perspective Button",
+  "controlify.touch.perspective_button.tooltip": "Shows a button at the top, beside chat, that switches the camera between first and third person, as the Change Perspective key does.",
+  "controlify.touch.easy_sprint": "Easy Sprint",
+  "controlify.touch.easy_sprint.tooltip": "Pushing the joystick past its edge sprints, with no button needed. Off, sprint with the sprint button."
 }

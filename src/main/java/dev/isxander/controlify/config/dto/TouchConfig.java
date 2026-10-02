@@ -9,6 +9,7 @@ package dev.isxander.controlify.config.dto;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.isxander.controlify.touch.JoystickVisibility;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
 
@@ -146,13 +147,19 @@ public record TouchConfig(
 	/**
 	 * The rest of Bedrock's Touch page (tl130 on), read and written as one entry of the codec above - which holds
 	 * sixteen at most, and has fifteen with this - but with its keys at the same level as every other in the section,
-	 * as a map codec's sit: {@code invert_y} (tl130, off by default). Each left out while it holds its default.
+	 * as a map codec's sit: {@code invert_y} (tl130, off by default), {@code joystick_visibility} (tl131,
+	 * {@code always_visible}, {@code always_hidden} or {@code hidden_when_unused}; a name this build does not know reads
+	 * as always visible), {@code perspective_button} (tl131, off) and {@code easy_sprint} (tl131, on - the stick sprints
+	 * past its rim as it has since tl111). Each left out while it holds its default.
 	 */
-	public record Options(boolean invertY) {
-		public static final Options DEFAULT = new Options(false);
+	public record Options(boolean invertY, JoystickVisibility joystickVisibility, boolean perspectiveButton, boolean easySprint) {
+		public static final Options DEFAULT = new Options(false, JoystickVisibility.ALWAYS_VISIBLE, false, true);
 
 		public static final MapCodec<Options> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-				Codec.BOOL.optionalFieldOf("invert_y", DEFAULT.invertY()).forGetter(Options::invertY)
+				Codec.BOOL.optionalFieldOf("invert_y", DEFAULT.invertY()).forGetter(Options::invertY),
+				JoystickVisibility.CODEC.lenientOptionalFieldOf("joystick_visibility", DEFAULT.joystickVisibility()).forGetter(Options::joystickVisibility),
+				Codec.BOOL.optionalFieldOf("perspective_button", DEFAULT.perspectiveButton()).forGetter(Options::perspectiveButton),
+				Codec.BOOL.optionalFieldOf("easy_sprint", DEFAULT.easySprint()).forGetter(Options::easySprint)
 		).apply(instance, Options::new));
 	}
 }

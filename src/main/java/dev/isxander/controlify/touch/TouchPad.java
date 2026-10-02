@@ -28,6 +28,7 @@ import dev.isxander.sdl.SdlVirtualJoystickDesc;
 import dev.isxander.sdl.SdlVirtualJoystickSensorDesc;
 import dev.isxander.sdl.SdlVirtualJoystickTouchpadDesc;
 import net.minecraft.client.AttackIndicatorStatus;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -395,8 +396,12 @@ public final class TouchPad {
 		TouchTap.breakProgress(minecraft.gameMode != null && minecraft.gameMode.isDestroying()
 				? (minecraft.gameMode.getDestroyStage() + 1) / 10f : 0f);
 		TouchPick.setEnabled(pickBlock());
+		TouchPerspective.setEnabled(perspectiveButton());
 		Turn turn = readFingers(TouchInput.fingers(), view(minecraft));
 		TouchPick.pick(minecraft);
+		if (TouchPerspective.takePress()) {
+			togglePerspective(minecraft);
+		}
 		int slot = TouchButtons.takeSlot();
 		if (slot >= 0) {
 			minecraft.player.getInventory().setSelectedSlot(slot);
@@ -501,6 +506,48 @@ public final class TouchPad {
 	public static boolean autoJump() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? TouchConfig.DEFAULT.autoJump() : config.getSettings().touchSettings().autoJump;
+	}
+
+	/** Whether the stick is drawn (tl131): as the player's Joystick Visibility says, held or at rest. */
+	static boolean stickDrawn(JoystickVisibility visibility, boolean held) {
+		return switch (visibility) {
+			case ALWAYS_VISIBLE -> true;
+			case ALWAYS_HIDDEN -> false;
+			case HIDDEN_WHEN_UNUSED -> held;
+		};
+	}
+
+	/** The player's Joystick Visibility (tl131), or always visible before there is a config to read it from. */
+	static JoystickVisibility joystickVisibility() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? JoystickVisibility.ALWAYS_VISIBLE : config.getSettings().touchSettings().joystickVisibility;
+	}
+
+	/** Whether pushing the stick past its rim sprints (tl131), or so before there is a config to read it from, as by default. */
+	static boolean easySprint() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null || config.getSettings().touchSettings().easySprint;
+	}
+
+	/** Whether the camera perspective button is shown (tl131), or not before there is a config to read it from. */
+	static boolean perspectiveButton() {
+		ConfigManager config = Controlify.instance().config();
+		return config != null && config.getSettings().touchSettings().perspectiveButton;
+	}
+
+	/**
+	 * The camera perspective button's press (tl131): the next perspective, as Controlify's Change Perspective binding
+	 * switches it ({@code InGameInputHandler}) and the game's own key.
+	 */
+	static void togglePerspective(Minecraft minecraft) {
+		CameraType cameraType = minecraft.options.getCameraType();
+		minecraft.options.setCameraType(minecraft.options.getCameraType().cycle());
+		if (cameraType.isFirstPerson() != minecraft.options.getCameraType().isFirstPerson()) {
+			minecraft.gameRenderer.checkEntityPostEffect(minecraft.options.getCameraType().isFirstPerson() ? minecraft.getCameraEntity() : null);
+		}
+
+		//? if <26.2
+		//minecraft.levelRenderer.needsUpdate();
 	}
 
 	/** Whether a swipe up looks down (tl130), or not before there is a config to read it from, as by default. */
@@ -620,11 +667,13 @@ public final class TouchPad {
 		for (TouchInput.Finger finger : fingers) {
 			FingerKey key = FingerKey.of(finger);
 			if (key.equals(stickFinger) || key.equals(lookFinger) || HELD_OVER.contains(key) || TouchButtons.owns(key)
-					|| TouchTap.owns(key) || TouchInteract.owns(key) || TouchPick.owns(key) || TouchDpad.owns(key)) {
+					|| TouchTap.owns(key) || TouchInteract.owns(key) || TouchPick.owns(key) || TouchPerspective.owns(key)
+					|| TouchDpad.owns(key)) {
 				continue;
 			}
 			boolean landed = !seen.contains(key);
-			if (landed && (TouchInteract.claim(finger, view) || TouchPick.claim(finger, view) || TouchDpad.claim(finger, view)
+			if (landed && (TouchInteract.claim(finger, view) || TouchPick.claim(finger, view) || TouchPerspective.claim(finger, view)
+					|| TouchDpad.claim(finger, view)
 					|| TouchButtons.claim(finger, view))) {
 				continue;
 			}
@@ -661,7 +710,8 @@ public final class TouchPad {
 				dx /= reach;
 				dy /= reach;
 			}
-			writeStick(dx, dy, reach > SPRINT_PAST);
+			// Easy sprint (tl131): pushed past its rim the stick sprints, unless the player turned that off.
+			writeStick(dx, dy, easySprint() && reach > SPRINT_PAST);
 		}
 
 		float[] drag = TouchButtons.update(fingers, view);
@@ -669,6 +719,7 @@ public final class TouchPad {
 		boolean useHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_LEFT_TRIGGER, now);
 		useHeld |= TouchInteract.update(fingers, view);
 		TouchPick.update(fingers);
+		TouchPerspective.update(fingers);
 		boolean attackHeld = TouchButtons.trigger(SdlGamepad.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, now);
 		if (view.tap()) {
 			TouchTap.update(fingers, view, target);
@@ -792,6 +843,7 @@ public final class TouchPad {
 		TouchTap.letGo();
 		TouchInteract.letGo();
 		TouchPick.letGo();
+		TouchPerspective.letGo();
 		TouchDpad.letGo();
 		writeButtons(0);
 		writeTriggers(false, false);
@@ -927,11 +979,12 @@ public final class TouchPad {
 	static void draw(GuiGraphicsExtractor graphics, View view) {
 		if (view.mode() == TouchMode.DPAD) {
 			TouchDpad.render(graphics, view);
-		} else {
+		} else if (stickDrawn(joystickVisibility(), stickFinger != null)) {
 			drawStick(graphics, view);
 		}
 		TouchButtons.render(graphics, view, false);
 		TouchPick.render(graphics, view);
+		TouchPerspective.render(graphics, view);
 		if (view.interact() != null) {
 			Minecraft minecraft = Minecraft.getInstance();
 			TouchInteract.draw(graphics, minecraft == null ? null : minecraft.font, view.interact(), TouchInteract.pressed());
@@ -1086,6 +1139,7 @@ public final class TouchPad {
 		TouchTap.letGo();
 		TouchInteract.letGo();
 		TouchInteract.clear();
+		TouchPerspective.letGo();
 		TouchPick.letGo();
 		TouchDpad.letGo();
 	}
