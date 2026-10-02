@@ -11,6 +11,7 @@ import com.mojang.blaze3d.platform.Window;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.config.ConfigManager;
 import dev.isxander.controlify.config.dto.TouchConfig;
+import dev.isxander.controlify.config.dto.TouchLayoutConfig;
 import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
@@ -192,6 +193,17 @@ public final class TouchPad {
 		public static Layout of(TouchSettings settings) {
 			return new Layout(settings.stickOffsetX, settings.stickOffsetY, TouchSettings.size(settings.stickSize),
 					settings.buttonsOffsetX, settings.buttonsOffsetY, TouchSettings.size(settings.buttonSize));
+		}
+
+		/** A scheme's layout as saved (tl129). */
+		public static Layout of(TouchLayoutConfig saved) {
+			return new Layout(saved.stickOffsetX(), saved.stickOffsetY(), TouchSettings.size(saved.stickSize()),
+					saved.buttonsOffsetX(), saved.buttonsOffsetY(), TouchSettings.size(saved.buttonSize()));
+		}
+
+		/** This layout to save. */
+		public TouchLayoutConfig saved() {
+			return new TouchLayoutConfig(stickX, stickY, stickSize, buttonsX, buttonsY, buttonSize);
 		}
 	}
 
@@ -406,6 +418,11 @@ public final class TouchPad {
 
 	/** The window as it is now, with this layout. */
 	private static View view(Minecraft minecraft, Layout layout) {
+		return view(minecraft, layout, mode());
+	}
+
+	/** The window as it is now, with this layout, in this scheme (tl129: the glyph editor previews any of the three). */
+	private static View view(Minecraft minecraft, Layout layout, TouchMode scheme) {
 		Window window = minecraft.getWindow();
 		LocalPlayer player = minecraft.player;
 		boolean hotbar = player != null && !player.isSpectator();
@@ -416,13 +433,17 @@ public final class TouchPad {
 		boolean flying = player != null && player.getAbilities().flying;
 		int guiWidth = window.getGuiScaledWidth();
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, mode(), TouchInteract.shown());
+				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, scheme, TouchInteract.shown());
 	}
 
-	/** The layout the player saved, or the default before there is a config to read it from. */
+	/** The layout the player saved for the scheme they play (tl129), or the default before there is a config to read it from. */
 	static Layout layout() {
 		ConfigManager config = Controlify.instance().config();
-		return config == null ? Layout.DEFAULT : Layout.of(config.getSettings().touchSettings());
+		if (config == null) {
+			return Layout.DEFAULT;
+		}
+		TouchSettings settings = config.getSettings().touchSettings();
+		return Layout.of(settings.layout(settings.mode));
 	}
 
 	/**
@@ -832,6 +853,11 @@ public final class TouchPad {
 		drawPreview(graphics, view(Minecraft.getInstance(), layout));
 	}
 
+	/** {@link #drawPreview(GuiGraphicsExtractor, Layout)} in a given scheme (tl129): the D-pad in D-pad mode, tap mode's buttons in tap mode. */
+	public static void drawPreview(GuiGraphicsExtractor graphics, Layout layout, TouchMode scheme) {
+		drawPreview(graphics, view(Minecraft.getInstance(), layout, scheme));
+	}
+
 	/**
 	 * This layout with its offsets kept to what holds the stick's ring and the five buttons inside this window, for
 	 * the glyph editor (tl117): its arrows and boxes stop at the edges rather than count on past them. The sizes are
@@ -839,8 +865,13 @@ public final class TouchPad {
 	 * offsets ({@link #rest}, {@link TouchButtons#shift}).
 	 */
 	public static Layout keptInside(Layout layout) {
+		return keptInside(layout, mode());
+	}
+
+	/** {@link #keptInside(Layout)} for a given scheme (tl129). */
+	public static Layout keptInside(Layout layout, TouchMode scheme) {
 		Window window = Minecraft.getInstance().getWindow();
-		return keptInside(layout, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(), window.getGuiScaledHeight(), mode());
+		return keptInside(layout, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(), window.getGuiScaledHeight(), scheme);
 	}
 
 	/** {@link #keptInside(Layout)}, against a given window - for tests. */
@@ -855,6 +886,14 @@ public final class TouchPad {
 		int fromCorner = Math.round(REST_FROM_CORNER * layout.stickSize() * guiHeight);
 		float stickX = within(layout.stickX(), (radius - fromCorner) / gui, (guiWidth - radius - 1 - fromCorner) / gui);
 		float stickY = within(layout.stickY(), (radius - guiHeight + fromCorner) / gui, (fromCorner - radius - 1) / gui);
+		if (mode == TouchMode.DPAD) {
+			// The D-pad in the stick's place (tl121), as far as its whole cross stays inside the window, in its pixels.
+			int unit = Math.max(1, Math.round(TouchDpad.SIZE * layout.stickSize() * height / TouchButtons.GRID));
+			int half = Math.round((TouchDpad.PITCH + TouchButtons.GRID / 2f) * unit);
+			int middle = Math.round(TouchDpad.FROM_CORNER * unit);
+			stickX = within(layout.stickX(), (half - middle) / (float) height, (width - half - middle) / (float) height);
+			stickY = within(layout.stickY(), (half - height + middle) / (float) height, (middle - half) / (float) height);
+		}
 		int[] unmoved = TouchButtons.bounds(width, height, new Layout(0f, 0f, 1f, 0f, 0f, layout.buttonSize()), mode);
 		float buttonsX = within(layout.buttonsX(), -unmoved[0] / (float) height, (width - unmoved[2]) / (float) height);
 		float buttonsY = within(layout.buttonsY(), -unmoved[1] / (float) height, (height - unmoved[3]) / (float) height);
@@ -868,8 +907,13 @@ public final class TouchPad {
 
 	/** {@link #drawPreview(GuiGraphicsExtractor, Layout)}, against a given window - for tests. */
 	static void drawPreview(GuiGraphicsExtractor graphics, View view) {
-		drawStick(graphics, view);
+		if (view.mode() == TouchMode.DPAD) {
+			TouchDpad.render(graphics, view);
+		} else {
+			drawStick(graphics, view);
+		}
 		TouchButtons.render(graphics, view, true);
+		TouchPick.render(graphics, view);
 	}
 
 	/** {@link #render}, against a given window - for tests. */

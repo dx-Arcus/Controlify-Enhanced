@@ -18,6 +18,7 @@ import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.gui.guide.GuideRenderer;
 import dev.isxander.controlify.gui.guide.PrecomputedLines;
 import dev.isxander.controlify.touch.TouchInput;
+import dev.isxander.controlify.touch.TouchMode;
 import dev.isxander.controlify.touch.TouchPad;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -75,6 +76,19 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	private static final int TAB_BAR_HEIGHT = 24;
 	private static final int TABBED_SUBTITLE_Y = TAB_BAR_HEIGHT + 4;
 	private static final int TABBED_CLUSTER_TOP = TABBED_SUBTITLE_Y + 12;
+	/**
+	 * The Touch tab's row of the three schemes (tl129), under the subtitle where the clusters would start, and the
+	 * clusters under it; on a screen too short for that (240 GUI pixels), the row in the subtitle's place instead.
+	 */
+	private static final int SCHEME_ROW_Y = TABBED_CLUSTER_TOP;
+	private static final int SCHEME_ROW_HEIGHT = 20;
+	private static final int SCHEME_MARGIN = 8;
+	private static final int SCHEME_GAP = 6;
+	private static final int TOUCH_CLUSTER_TOP = SCHEME_ROW_Y + SCHEME_ROW_HEIGHT + 6;
+	private static final int COMPACT_SCHEME_ROW_Y = TAB_BAR_HEIGHT + 2;
+	private static final int COMPACT_TOUCH_CLUSTER_TOP = COMPACT_SCHEME_ROW_Y + SCHEME_ROW_HEIGHT + 4;
+	/** Where the footer's buttons start, up from the bottom. */
+	private static final int FOOTER_FROM_BOTTOM = 28;
 
 	/** A size slider is as wide as its cluster, up to this. */
 	private static final int SIZE_SLIDER_MAX_WIDTH = 150;
@@ -138,6 +152,15 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	private @Nullable SizeSlider stickSlider;
 	private @Nullable SizeSlider buttonSlider;
 
+	/**
+	 * Each scheme's layout (tl129), by {@link TouchMode} ordinal; the one being edited lives in the six fields above
+	 * while it is, and is put back here when another is picked or the screen saves.
+	 */
+	private final TouchPad.Layout[] layouts = new TouchPad.Layout[TouchMode.values().length];
+	/** The scheme being edited and previewed: the one played, when the screen opens. */
+	private TouchMode scheme = TouchMode.CROSSHAIR;
+	private final List<Button> schemeButtons = new ArrayList<>();
+
 	/** The tab showing; kept when the screen is resized, which builds everything again. */
 	private int page;
 	/** The tab whose controls are being built, or null while they go straight onto the screen. */
@@ -156,12 +179,11 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 
 		this.touchSettings = tabs ? Controlify.instance().config().getSettings().touchSettings() : null;
 		if (touchSettings != null) {
-			this.stickX = touchSettings.stickOffsetX;
-			this.stickY = touchSettings.stickOffsetY;
-			this.stickSize = TouchSettings.size(touchSettings.stickSize);
-			this.buttonsX = touchSettings.buttonsOffsetX;
-			this.buttonsY = touchSettings.buttonsOffsetY;
-			this.buttonSize = TouchSettings.size(touchSettings.buttonSize);
+			for (TouchMode each : TouchMode.values()) {
+				layouts[each.ordinal()] = TouchPad.Layout.of(touchSettings.layout(each));
+			}
+			this.scheme = touchSettings.mode;
+			load(layouts[scheme.ordinal()]);
 		}
 		// Playing by touch, the player has come for the touch controls.
 		this.page = tabs && TouchPad.active() ? TOUCH : GUIDES;
@@ -181,6 +203,25 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	}
 
 	private ClusterLayout clusterLayout() {
+		return clusterLayout(false);
+	}
+
+	/** The clusters, on the Touch tab clear of its row of schemes (tl129). */
+	private ClusterLayout clusterLayout(boolean touch) {
+		if (!touch) {
+			return clusterLayout(TABBED_CLUSTER_TOP);
+		}
+		return compact() ? clusterLayout(COMPACT_TOUCH_CLUSTER_TOP) : clusterLayout(TOUCH_CLUSTER_TOP);
+	}
+
+	/** Whether the Touch tab's clusters under its row of schemes would reach the footer: then the row takes the subtitle's place. */
+	private boolean compact() {
+		ClusterLayout below = clusterLayout(TOUCH_CLUSTER_TOP);
+		return below.cornerY() + SIZE_SLIDER_HEIGHT > height - FOOTER_FROM_BOTTOM - 2;
+	}
+
+	/** The clusters, no higher than this when there are tabs. */
+	private ClusterLayout clusterLayout(int lowestTop) {
 		int gridSize = BUTTON_SIZE * 3;
 		int cornerGridHeight = CORNER_BUTTON_HEIGHT * 2 + CORNER_BUTTON_GAP;
 
@@ -201,7 +242,7 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		int clusterTop = height / 2 - clusterHeight / 2;
 		if (tabs) {
 			// Clear of the tab bar and the subtitle under it.
-			clusterTop = Math.max(clusterTop, TABBED_CLUSTER_TOP);
+			clusterTop = Math.max(clusterTop, lowestTop);
 		}
 		int gridY = clusterTop + LABEL_HEIGHT;
 		int leftClusterX = width / 2 - CLUSTER_GAP / 2 - clusterWidth;
@@ -293,7 +334,7 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 			bar.selectTab(page, false);
 		}
 
-		int footerY = height - 28;
+		int footerY = height - FOOTER_FROM_BOTTOM;
 		addRenderableWidget(Button.builder(Component.translatable(KEY + ".reset_all"), b -> resetAll())
 				.bounds(width / 2 - FOOTER_BUTTON_WIDTH - 4, footerY, FOOTER_BUTTON_WIDTH, 20)
 				.build());
@@ -370,7 +411,8 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	 * snaps' place a size slider.
 	 */
 	private void addTouchControls() {
-		ClusterLayout layout = clusterLayout();
+		addSchemeButtons();
+		ClusterLayout layout = clusterLayout(true);
 		Cluster left = layout.left();
 		Cluster right = layout.right();
 
@@ -412,10 +454,84 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		buttonSlider = addControl(sizeSlider(right, layout.cornerY(), buttonSize, size -> buttonSize = size, KEY + ".touch.buttons_size.tooltip"));
 	}
 
-	/** A move of the touch controls: made, then held to what keeps them inside the window. */
+	/**
+	 * The three schemes along the top of the Touch tab (tl129, Donny 2 Oct 01:41, his sketch): the first at the left,
+	 * the second in the middle, the third at the right - packed together in the middle where the screen is too narrow
+	 * for that, by their short names where even that is too narrow for the full ones. The one being edited is shown
+	 * pressed in; picking another edits and previews that one's layout.
+	 */
+	private void addSchemeButtons() {
+		schemeButtons.clear();
+		TouchMode[] schemes = TouchMode.values();
+		Component[] names = new Component[schemes.length];
+		int[] widths = new int[schemes.length];
+		int total = 0;
+		for (boolean shortNames : new boolean[] {false, true}) {
+			total = SCHEME_GAP * (schemes.length - 1);
+			for (int i = 0; i < schemes.length; i++) {
+				names[i] = shortNames ? Component.translatable(KEY + ".touch.scheme." + schemes[i].getSerializedName()) : schemes[i].getDisplayName();
+				widths[i] = font.width(names[i]) + 16;
+				total += widths[i];
+			}
+			if (total <= width - SCHEME_MARGIN * 2) {
+				break;
+			}
+		}
+		int[] xs = new int[schemes.length];
+		boolean spread = schemes.length == 3;
+		if (spread) {
+			xs[0] = SCHEME_MARGIN;
+			xs[1] = (width - widths[1]) / 2;
+			xs[2] = width - SCHEME_MARGIN - widths[2];
+			spread = xs[0] + widths[0] + SCHEME_GAP <= xs[1] && xs[1] + widths[1] + SCHEME_GAP <= xs[2];
+		}
+		if (!spread) {
+			int x = (width - total) / 2;
+			for (int i = 0; i < schemes.length; i++) {
+				xs[i] = x;
+				x += widths[i] + SCHEME_GAP;
+			}
+		}
+		for (int i = 0; i < schemes.length; i++) {
+			TouchMode each = schemes[i];
+			Button button = Button.builder(names[i], b -> selectScheme(each))
+					.bounds(xs[i], compact() ? COMPACT_SCHEME_ROW_Y : SCHEME_ROW_Y, widths[i], SCHEME_ROW_HEIGHT)
+					.build();
+			button.active = each != scheme;
+			schemeButtons.add(addControl(button));
+		}
+	}
+
+	/** Edits another scheme's layout: this one's kept, that one's loaded into the clusters and the preview. */
+	private void selectScheme(TouchMode next) {
+		layouts[scheme.ordinal()] = touchLayout();
+		scheme = next;
+		load(layouts[scheme.ordinal()]);
+		if (stickSlider != null && buttonSlider != null) {
+			stickSlider.set(stickSize);
+			buttonSlider.set(buttonSize);
+		}
+		syncEditBoxes();
+		TouchMode[] schemes = TouchMode.values();
+		for (int i = 0; i < schemeButtons.size() && i < schemes.length; i++) {
+			schemeButtons.get(i).active = schemes[i] != scheme;
+		}
+	}
+
+	/** Puts a layout into the six fields the clusters edit. */
+	private void load(TouchPad.Layout layout) {
+		stickX = layout.stickX();
+		stickY = layout.stickY();
+		stickSize = layout.stickSize();
+		buttonsX = layout.buttonsX();
+		buttonsY = layout.buttonsY();
+		buttonSize = layout.buttonSize();
+	}
+
+	/** A move of the touch controls: made, then held to what keeps them inside the window, in the scheme being edited. */
 	private void moved(Runnable move) {
 		move.run();
-		TouchPad.Layout kept = TouchPad.keptInside(touchLayout());
+		TouchPad.Layout kept = TouchPad.keptInside(touchLayout(), scheme);
 		stickX = kept.stickX();
 		stickY = kept.stickY();
 		buttonsX = kept.buttonsX();
@@ -557,7 +673,7 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		}
 	}
 
-	/** Puts back what the tab showing edits: the guides' offsets, or the touch controls' places and sizes. */
+	/** Puts back what the tab showing edits: the guides' offsets, or the touch controls' places and sizes in the scheme being edited (tl129). */
 	private void resetAll() {
 		if (page == TOUCH) {
 			stickX = 0f;
@@ -585,12 +701,10 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		guideSettings.ingameGuideOffsetRightX = rightOffsetX;
 		guideSettings.ingameGuideOffsetRightY = rightOffsetY;
 		if (touchSettings != null) {
-			touchSettings.stickOffsetX = stickX;
-			touchSettings.stickOffsetY = stickY;
-			touchSettings.stickSize = stickSize;
-			touchSettings.buttonsOffsetX = buttonsX;
-			touchSettings.buttonsOffsetY = buttonsY;
-			touchSettings.buttonSize = buttonSize;
+			layouts[scheme.ordinal()] = touchLayout();
+			for (TouchMode each : TouchMode.values()) {
+				touchSettings.setLayout(each, layouts[each.ordinal()].saved());
+			}
 		}
 		Controlify.instance().config().saveSafely();
 		MinecraftUtil.setScreen(parent);
@@ -611,7 +725,7 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		boolean touch = tabs && page == TOUCH;
 		if (touch) {
 			// Under the controls: the touch controls as the game would draw them, moved and sized as set here.
-			TouchPad.drawPreview(graphics, touchLayout());
+			TouchPad.drawPreview(graphics, touchLayout(), scheme);
 		}
 
 		super.extractRenderState(graphics, mouseX, mouseY, a);
@@ -622,12 +736,15 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 		} else {
 			graphics.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
 		}
-		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.subtitle" : KEY + ".subtitle"), width / 2, subtitleY, 0xFFA0A0A0);
+		if (!touch || !compact()) {
+			graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.subtitle" : KEY + ".subtitle"), width / 2, subtitleY, 0xFFA0A0A0);
+		}
 
-		ClusterLayout layout = clusterLayout();
+		ClusterLayout layout = clusterLayout(touch);
 		int gridSize = layout.gridSize();
 
-		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.stick" : KEY + ".left_side"), layout.left().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
+		String leftLabel = touch ? (scheme == TouchMode.DPAD ? KEY + ".touch.dpad" : KEY + ".touch.stick") : KEY + ".left_side";
+		graphics.centeredText(font, Component.translatable(leftLabel), layout.left().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
 		graphics.centeredText(font, Component.translatable(touch ? KEY + ".touch.buttons" : KEY + ".right_side"), layout.right().gridX() + gridSize / 2, layout.gridY() - LABEL_HEIGHT, 0xFFFFFFFF);
 
 		int rowY = layout.rowY();
