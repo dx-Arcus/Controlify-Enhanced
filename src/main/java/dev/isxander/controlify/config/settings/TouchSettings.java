@@ -13,8 +13,8 @@ import net.minecraft.util.Mth;
 
 /**
  * The touch controls' settings, live: the layout (tl117), edited in the glyph editor's Touch tab, the mode (tl118),
- * switched by the Dev Functions panel's Touch Mode, and when they are on (tl120), the camera sensitivity (tl123) and
- * auto jump (tl124), set in the touch settings screen - all read every frame by the touch controls.
+ * when they are on (tl120), the camera sensitivity (tl123) and auto jump (tl124), set in the touch settings screen -
+ * all read every frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */

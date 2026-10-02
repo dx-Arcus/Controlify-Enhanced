@@ -75,7 +75,8 @@ import java.util.Set;
  * pad lets go, the screens' controller glyphs are not drawn, and a close button stands in for Esc
  * ({@link #renderScreen}, {@link #closeTapped}, tl116). Where the stick rests and the buttons sit, and how
  * big each is, the player sets in the glyph editor's Touch tab, and that is saved ({@link Layout}, tl117); so
- * is the mode, switched for now by the panel's Touch Mode (tl118).
+ * is the mode (tl118), set on the touch settings screen (tl122; the Dev Functions panel's button for it gone
+ * since tl126).
  *
  * <p>On by themselves (tl120, {@link TouchControls}): at the first finger on a touchscreen, which does nothing
  * else, and off again at a click or scroll of the mouse, a key pressed in the world or a controller's input - or

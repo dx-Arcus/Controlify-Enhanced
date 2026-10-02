@@ -13,11 +13,9 @@ import dev.isxander.controlify.config.dto.DevConfig;
 import dev.isxander.controlify.config.dto.TargetLockConfig;
 import dev.isxander.controlify.config.settings.GlobalSettings;
 import dev.isxander.controlify.config.settings.TargetLockSettings;
-import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
 import dev.isxander.controlify.touch.TouchDebugOverlay;
 import dev.isxander.controlify.touch.TouchInput;
-import dev.isxander.controlify.touch.TouchMode;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.MinecraftUtil;
 import net.minecraft.client.Minecraft;
@@ -110,7 +108,6 @@ public final class DevFunctions {
 		button("controlify.gui.dev_functions.controller_connection", ALWAYS, DevFunctions::showConnectionToast);
 		button("controlify.gui.dev_functions.forget_connections", ALWAYS, DevFunctions::forgetConnections);
 		if (TouchInput.SUPPORTED) {
-			button("controlify.gui.dev_functions.touch_mode", ALWAYS, DevFunctions::nextTouchMode);
 			button("controlify.gui.dev_functions.touch_mouse_as_finger", ALWAYS, DevFunctions::toggleMouseAsFinger);
 			button("controlify.gui.dev_functions.touch_show_fingers", ALWAYS, DevFunctions::toggleShowFingers);
 		}
@@ -427,18 +424,6 @@ public final class DevFunctions {
 	/** Splits a stored set of paths back out, through {@link #learnable}, so an empty setting is an empty set. */
 	private static Set<String> paths(String stored) {
 		return learnable(List.of(stored.split(DevConfig.PATH_SEPARATOR)));
-	}
-
-	/**
-	 * Moves the touch controls on to their next mode (tl118, {@link TouchMode}) - aim crosshair, tap to interact,
-	 * round again - saves it, and says which it is now. A stand-in for the touch settings page still to come.
-	 */
-	private static void nextTouchMode() {
-		TouchSettings touch = Controlify.instance().config().getSettings().touchSettings();
-		TouchMode[] modes = TouchMode.values();
-		touch.mode = modes[(touch.mode.ordinal() + 1) % modes.length];
-		Controlify.instance().config().saveSafely();
-		MinecraftUtil.sendToast(Component.translatable("controlify.toast.touch.mode"), touch.mode.getDisplayName(), false);
 	}
 
 	/** Flips whether the mouse stands in for a finger (tl110, {@link TouchInput#setMouseAsFinger}) and says which way it went. */
