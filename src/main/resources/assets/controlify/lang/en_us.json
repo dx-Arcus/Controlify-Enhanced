@@ -994,5 +994,7 @@
   "controlify.touch.camera_sensitivity": "Camera Sensitivity",
   "controlify.touch.camera_sensitivity.tooltip": "How fast the camera turns as you swipe to look around. At 50, a swipe across the whole screen turns you all the way round; higher is faster, lower slower.",
   "controlify.touch.auto_jump": "Auto Jump",
-  "controlify.touch.auto_jump.tooltip": "While the touch controls are on, walking into a single block jumps up it. The keyboard's and each controller's own Auto Jump are left as they are."
+  "controlify.touch.auto_jump.tooltip": "While the touch controls are on, walking into a single block jumps up it. The keyboard's and each controller's own Auto Jump are left as they are.",
+  "controlify.touch.spyglass_damping": "Spyglass Damping",
+  "controlify.touch.spyglass_damping.tooltip": "How much the camera slows while you look through a spyglass, so a swipe is easier to aim. 0 does not slow it; 50 slows it to an eighth, as the game slows the mouse; 100 to a sixty-fourth."
 }

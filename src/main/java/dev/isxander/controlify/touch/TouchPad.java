@@ -389,6 +389,10 @@ public final class TouchPad {
 		}
 		if (turn.any()) {
 			float units = lookSpeed(cameraSensitivity()) * TURN_UNITS_PER_DEGREE;
+			// Through a spyglass, slowed as the game slows the mouse there (first person and scoping), by the player's damping.
+			if (minecraft.options.getCameraType().isFirstPerson() && minecraft.player.isScoping()) {
+				units *= spyglassSpeed(spyglassDamping());
+			}
 			minecraft.player.turn(turn.yawDegrees() * units, turn.pitchDegrees() * units);
 		}
 	}
@@ -473,6 +477,21 @@ public final class TouchPad {
 	public static boolean autoJump() {
 		ConfigManager config = Controlify.instance().config();
 		return config == null ? TouchConfig.DEFAULT.autoJump() : config.getSettings().touchSettings().autoJump;
+	}
+
+	/** The player's spyglass damping (tl127), or the middle before there is a config to read it from. */
+	static int spyglassDamping() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TouchConfig.DEFAULT_DAMPING : config.getSettings().touchSettings().spyglassDamping;
+	}
+
+	/**
+	 * How fast a swipe turns the camera through a spyglass at a damping (tl127), as a multiple of its speed without:
+	 * eight to the minus damping over 50 - 0 no slower, the middle, 50, an eighth, as the game slows the mouse there,
+	 * and 100 a sixty-fourth.
+	 */
+	static float spyglassSpeed(int damping) {
+		return (float) Math.pow(8.0, -damping / 50.0);
 	}
 
 	/** The player's camera sensitivity (tl123), or the middle before there is a config to read it from. */
