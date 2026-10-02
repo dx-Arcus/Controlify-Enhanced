@@ -17,7 +17,8 @@ import java.util.List;
 /**
  * Bedrock's D-pad (tl121), for D-pad &amp; tap to interact: bottom left, in place of the stick, five cells touching -
  * forward, left, sneak in the middle, right, back - and while forward is held the two diagonals beside it. One finger
- * has it: the one that lands on a cell, which slides from cell to cell. Forward tapped twice sprints while it is held.
+ * has it: the one that lands on a cell, which slides from cell to cell - with no gap between them as it slides (tl132).
+ * Forward tapped twice sprints while it is held.
  * Drawn as the touch buttons are drawn, their size, moved and sized with the player's joystick layout (tl117).
  */
 final class TouchDpad {
@@ -110,6 +111,31 @@ final class TouchDpad {
 		return null;
 	}
 
+	/**
+	 * Whether a sliding finger is on this cell (tl132): its box widened by half the unit-wide gap on every side, so
+	 * neighbouring cells' areas meet and a finger sliding from one to the next - forward onto a diagonal, say - is
+	 * never on none of them between the two (Donny, 2 Oct 03:22: a sprint let go there, and the diagonals went with
+	 * it). A finger landing still has to land on the cell itself ({@link #at}).
+	 */
+	static boolean slideContains(Cell of, float px, float py, TouchPad.View view) {
+		Box box = box(of, view);
+		int unit = box.unit();
+		float left = box.x() - unit / 2;
+		float top = box.y() - unit / 2;
+		int pitch = PITCH * unit;
+		return px >= left && px < left + pitch && py >= top && py < top + pitch;
+	}
+
+	/** The shown cell a sliding finger at a point of the window is on, in pixels; null for none (tl132). */
+	private static @Nullable Cell slidTo(float px, float py, TouchPad.View view) {
+		for (Cell candidate : Cell.values()) {
+			if (shown(candidate) && slideContains(candidate, px, py, view)) {
+				return candidate;
+			}
+		}
+		return null;
+	}
+
 	/** A finger has just landed: in D-pad mode, if it is on a cell and no finger has the D-pad, it has it now. True if so. */
 	static boolean claim(TouchInput.Finger landed, TouchPad.View view) {
 		if (view.mode() != TouchMode.DPAD || finger != null) {
@@ -155,10 +181,10 @@ final class TouchDpad {
 		}
 		float px = now.x() * view.width();
 		float py = now.y() * view.height();
-		if (cell != null && box(cell, view).contains(px, py)) {
+		if (cell != null && slideContains(cell, px, py, view)) {
 			return;
 		}
-		Cell under = at(px, py, view);
+		Cell under = slidTo(px, py, view);
 		if (under == Cell.SNEAK && cell != Cell.SNEAK) {
 			sneakAt = view.nanos();
 		}
