@@ -19,8 +19,9 @@ import java.util.Optional;
  * The touch controls' settings, live: the layout (tl117) - one for each scheme since tl129, aim crosshair's in the six
  * fields below and the tap schemes' in their own - edited in the glyph editor's Touch tab, the mode (tl118),
  * when they are on (tl120), joystick visibility (tl131), the camera sensitivity (tl123), invert Y (tl130), the spyglass
- * damping (tl127), the perspective button and easy sprint (tl131), auto jump (tl124) and the
- * Pick Block button (tl128), set in the touch settings screen - all read every frame by the touch controls.
+ * damping (tl127), the perspective button and easy sprint (tl131), auto jump (tl124), the Pick Block button (tl128)
+ * and which side of the hotbar the inventory button is on (tl133), set in the touch settings screen - all read every
+ * frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */
@@ -50,6 +51,8 @@ public class TouchSettings {
 	public JoystickVisibility joystickVisibility;
 	public boolean perspectiveButton;
 	public boolean easySprint;
+	/** Whether the inventory button sits on the left of the hotbar rather than the right (tl133). */
+	public boolean leftHandedInventory;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY,
 			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping,
@@ -73,6 +76,7 @@ public class TouchSettings {
 		this.joystickVisibility = options.joystickVisibility() == null ? JoystickVisibility.ALWAYS_VISIBLE : options.joystickVisibility();
 		this.perspectiveButton = options.perspectiveButton();
 		this.easySprint = options.easySprint();
+		this.leftHandedInventory = options.leftHandedInventory();
 	}
 
 	/** A layout as read: offsets that are not numbers at all none, sizes within what the Touch tab offers. */
@@ -125,7 +129,7 @@ public class TouchSettings {
 	public TouchConfig toDTO() {
 		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls,
 				cameraSensitivity, autoJump, spyglassDamping, pickBlock, own(tapLayout), own(dpadLayout),
-				new TouchConfig.Options(invertY, joystickVisibility, perspectiveButton, easySprint));
+				new TouchConfig.Options(invertY, joystickVisibility, perspectiveButton, easySprint, leftHandedInventory));
 	}
 
 	/** A tap scheme's layout to save: none while it is aim crosshair's, which a missing one reads as. */

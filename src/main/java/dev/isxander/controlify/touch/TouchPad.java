@@ -438,8 +438,16 @@ public final class TouchPad {
 				&& (player.getMainArm() == HumanoidArm.LEFT || minecraft.options.attackIndicator().get() == AttackIndicatorStatus.HOTBAR);
 		boolean flying = player != null && player.getAbilities().flying;
 		int guiWidth = window.getGuiScaledWidth();
+		int inventoryX = TouchButtons.inventoryX(guiWidth, rightSideTaken);
+		if (leftHandedInventory()) {
+			// Left-Handed Inventory Access (tl133): on the left instead, against the hotbar unless the offhand slot or the
+			// attack indicator is there (tl134).
+			boolean leftSideTaken = player != null && leftSideTaken(player.getMainArm(), !player.getOffhandItem().isEmpty(),
+					minecraft.options.attackIndicator().get() == AttackIndicatorStatus.HOTBAR);
+			inventoryX = TouchButtons.inventoryLeftX(guiWidth, leftSideTaken);
+		}
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, TouchButtons.inventoryX(guiWidth, rightSideTaken), flying, System.nanoTime(), layout, scheme, TouchInteract.shown());
+				hotbar, inventoryX, flying, System.nanoTime(), layout, scheme, TouchInteract.shown());
 	}
 
 	/** The layout the player saved for the scheme they play (tl129), or the default before there is a config to read it from. */
@@ -548,6 +556,22 @@ public final class TouchPad {
 
 		//? if <26.2
 		//minecraft.levelRenderer.needsUpdate();
+	}
+
+	/**
+	 * Whether the left of the hotbar is taken, for the inventory button there (tl134; Donny, 2 Oct 04:13: "so it looks
+	 * cleaner"): by the offhand slot - the right-handed's, drawn while the off hand holds something, as 26.3's Hud
+	 * draws it, so the button steps out only then - or by the attack indicator - the left-handed's, set to the hotbar,
+	 * kept clear of whether drawn this frame or not, as it comes and goes with every swing.
+	 */
+	static boolean leftSideTaken(HumanoidArm mainArm, boolean offhandHeld, boolean attackIndicatorOnHotbar) {
+		return mainArm == HumanoidArm.RIGHT ? offhandHeld : attackIndicatorOnHotbar;
+	}
+
+	/** Whether the inventory button is on the left of the hotbar (tl133), or not before there is a config to read it from, as by default. */
+	static boolean leftHandedInventory() {
+		ConfigManager config = Controlify.instance().config();
+		return config != null && config.getSettings().touchSettings().leftHandedInventory;
 	}
 
 	/** Whether a swipe up looks down (tl130), or not before there is a config to read it from, as by default. */
@@ -1017,8 +1041,9 @@ public final class TouchPad {
 	 * the stick's size so it grows from that corner as the buttons grow from theirs, then moved by the player's
 	 * offsets (tl117) - and moved left, or if it cannot go far enough or is right of the middle, up, just clear of
 	 * the hotbar and what the game stacks over it wherever the ring would reach over them (a narrow window at a large
-	 * GUI scale); last, kept inside the window, however the player moved and sized it (tl117), the edges of its own
-	 * corner winning were it ever too big. At its default place and size it is inside already.
+	 * GUI scale), and up clear of the inventory slot when it is on the hotbar's left (tl133); last, kept inside the
+	 * window, however the player moved and sized it (tl117), the edges of its own corner winning were it ever too
+	 * big. At its default place and size it is inside already.
 	 */
 	static int[] rest(View view, int width, int height, int radius) {
 		int fromCorner = Math.round(REST_FROM_CORNER * view.layout().stickSize() * height);
@@ -1033,6 +1058,13 @@ public final class TouchPad {
 				x = left;
 			} else {
 				y = stackTop - radius - 2;
+			}
+		}
+		if (view.hotbar() && TouchButtons.inventoryOnLeft(view)) {
+			int slotLeft = view.inventoryX();
+			int slotTop = height - TouchButtons.HOTBAR_HEIGHT - 1;
+			if (x + radius + 2 > slotLeft && x - radius - 2 < slotLeft + TouchButtons.SLOT_SIZE && y + radius + 2 > slotTop) {
+				y = slotTop - radius - 2;
 			}
 		}
 		// The ring is drawn from radius left of its centre to radius right of it, and as far up and down.

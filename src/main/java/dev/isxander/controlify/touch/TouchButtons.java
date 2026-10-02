@@ -562,6 +562,35 @@ public final class TouchButtons {
 	}
 
 	/**
+	 * Where the inventory slot's left edge is on the left of the hotbar (tl133, Left-Handed Inventory Access), in GUI
+	 * pixels: the right side's place mirrored - before the hotbar, and before the offhand slot or the attack indicator
+	 * when either is on that side.
+	 */
+	static int inventoryLeftX(int guiWidth, boolean leftSideTaken) {
+		return guiWidth / 2 - HOTBAR_HALF_WIDTH - 1 - SLOT_SIZE - (leftSideTaken ? 29 : 0);
+	}
+
+	/** Whether this frame's inventory slot is on the left of the hotbar (tl133). */
+	static boolean inventoryOnLeft(TouchPad.View view) {
+		return view.inventoryX() < view.guiWidth() / 2;
+	}
+
+	/**
+	 * The inventory slot on the left of the hotbar (tl133), in the window's pixels - its left, top, right and bottom
+	 * edges, the top a GUI pixel above the slot as {@link #lift} has it - or null while it is on the right or there is
+	 * no hotbar: what the stick, the D-pad and the Pick Block button keep clear of, as the five keep clear of it on the
+	 * right.
+	 */
+	static int[] leftSlot(TouchPad.View view) {
+		if (!view.hotbar() || !inventoryOnLeft(view)) {
+			return null;
+		}
+		int scale = view.scale();
+		return new int[] {view.inventoryX() * scale, (view.guiHeight() - HOTBAR_HEIGHT - 1) * scale,
+				(view.inventoryX() + SLOT_SIZE) * scale, view.guiHeight() * scale};
+	}
+
+	/**
 	 * A finger has just landed: if it is on a button, the hotbar or the inventory slot, it is ours from now
 	 * until it lifts. True if it is.
 	 */
@@ -723,8 +752,10 @@ public final class TouchButtons {
 		if (view.hotbar() && !placedOnly) {
 			int x = view.inventoryX();
 			int y = view.guiHeight() - HOTBAR_HEIGHT;
-			// The hotbar's own last slot and right end, so it reads as a tenth slot.
-			graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, 182, 22, 160, 0, x, y, SLOT_SIZE, HOTBAR_HEIGHT);
+			// The hotbar's own last slot and right end, so it reads as a tenth slot - or on the left (tl133) its first slot
+			// and left end.
+			int u = inventoryOnLeft(view) ? 0 : 182 - SLOT_SIZE;
+			graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, 182, 22, u, 0, x, y, SLOT_SIZE, HOTBAR_HEIGHT);
 			graphics.fill(x + 3, y + 3, x + 19, y + 19, held(INVENTORY, view.nanos()) ? 0x80FFFFFF : 0x40FFFFFF);
 			for (int dot = 0; dot < 3; dot++) {
 				graphics.fill(x + 6 + dot * 5, y + 11, x + 8 + dot * 5, y + 13, SHADOW);

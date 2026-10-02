@@ -149,17 +149,20 @@ public record TouchConfig(
 	 * sixteen at most, and has fifteen with this - but with its keys at the same level as every other in the section,
 	 * as a map codec's sit: {@code invert_y} (tl130, off by default), {@code joystick_visibility} (tl131,
 	 * {@code always_visible}, {@code always_hidden} or {@code hidden_when_unused}; a name this build does not know reads
-	 * as always visible), {@code perspective_button} (tl131, off) and {@code easy_sprint} (tl131, on - the stick sprints
-	 * past its rim as it has since tl111). Each left out while it holds its default.
+	 * as always visible), {@code perspective_button} (tl131, off), {@code easy_sprint} (tl131, on - the stick sprints
+	 * past its rim as it has since tl111) and {@code left_handed_inventory} (tl133, off). Each left out while it holds
+	 * its default.
 	 */
-	public record Options(boolean invertY, JoystickVisibility joystickVisibility, boolean perspectiveButton, boolean easySprint) {
-		public static final Options DEFAULT = new Options(false, JoystickVisibility.ALWAYS_VISIBLE, false, true);
+	public record Options(boolean invertY, JoystickVisibility joystickVisibility, boolean perspectiveButton, boolean easySprint,
+			boolean leftHandedInventory) {
+		public static final Options DEFAULT = new Options(false, JoystickVisibility.ALWAYS_VISIBLE, false, true, false);
 
 		public static final MapCodec<Options> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
 				Codec.BOOL.optionalFieldOf("invert_y", DEFAULT.invertY()).forGetter(Options::invertY),
 				JoystickVisibility.CODEC.lenientOptionalFieldOf("joystick_visibility", DEFAULT.joystickVisibility()).forGetter(Options::joystickVisibility),
 				Codec.BOOL.optionalFieldOf("perspective_button", DEFAULT.perspectiveButton()).forGetter(Options::perspectiveButton),
-				Codec.BOOL.optionalFieldOf("easy_sprint", DEFAULT.easySprint()).forGetter(Options::easySprint)
+				Codec.BOOL.optionalFieldOf("easy_sprint", DEFAULT.easySprint()).forGetter(Options::easySprint),
+				Codec.BOOL.optionalFieldOf("left_handed_inventory", DEFAULT.leftHandedInventory()).forGetter(Options::leftHandedInventory)
 		).apply(instance, Options::new));
 	}
 }

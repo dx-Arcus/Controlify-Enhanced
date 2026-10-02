@@ -19,7 +19,8 @@ import java.util.List;
  * forward, left, sneak in the middle, right, back - and while forward is held the two diagonals beside it. One finger
  * has it: the one that lands on a cell, which slides from cell to cell - with no gap between them as it slides (tl132).
  * Forward tapped twice sprints while it is held.
- * Drawn as the touch buttons are drawn, their size, moved and sized with the player's joystick layout (tl117).
+ * Drawn as the touch buttons are drawn, their size, moved and sized with the player's joystick layout (tl117), and
+ * lifted clear of the inventory slot when it is on the hotbar's left (tl133).
  */
 final class TouchDpad {
 	/** A cell's side, in window heights: the touch buttons' (tl115). */
@@ -98,6 +99,19 @@ final class TouchDpad {
 		middleX = Math.max(half, Math.min(view.width() - half, middleX));
 		middleY = Math.max(half, Math.min(height - half, middleY));
 		int side = unit * TouchButtons.GRID;
+		// Up clear of the inventory slot when it is on the hotbar's left (tl133): every cell over it a unit above it.
+		int[] slot = TouchButtons.leftSlot(view);
+		if (slot != null) {
+			int lift = 0;
+			for (Cell cell : Cell.values()) {
+				int left = middleX + cell.column * PITCH * unit - side / 2;
+				int bottom = middleY + cell.row * PITCH * unit - side / 2 + side;
+				if (left + side > slot[0] && left < slot[2]) {
+					lift = Math.max(lift, bottom + unit - slot[1]);
+				}
+			}
+			middleY -= lift;
+		}
 		return new Box(middleX + of.column * PITCH * unit - side / 2, middleY + of.row * PITCH * unit - side / 2, unit);
 	}
 

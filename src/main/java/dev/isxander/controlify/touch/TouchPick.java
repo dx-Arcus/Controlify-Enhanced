@@ -100,6 +100,11 @@ final class TouchPick {
 			if (x + side > hotbarLeft && x < hotbarRight && y + side > stackTop) {
 				y = stackTop - side - unit;
 			}
+			// Nor over the inventory slot when it is on the hotbar's left (tl133).
+			int[] slot = TouchButtons.leftSlot(view);
+			if (slot != null && x + side > slot[0] && x < slot[2] && y + side + unit > slot[1]) {
+				y = slot[1] - side - unit;
+			}
 		}
 		x = Math.max(0, Math.min(x, view.width() - side));
 		y = Math.max(0, Math.min(y, height - side));
