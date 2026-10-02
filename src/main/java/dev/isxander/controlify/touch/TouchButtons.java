@@ -403,12 +403,24 @@ public final class TouchButtons {
 	 * place of the one below it ({@link #lower}, Donny 1 Oct 15:50: option B) - sneak in the corner.
 	 */
 	static Box box(Button button, int width, int height, TouchPad.Layout layout, TouchMode mode) {
+		return box(button, width, height, layout, mode, 1f);
+	}
+
+	/**
+	 * As above, with the top row - chat and pause - this many times Small's size (tl135, Top Button Size): their gaps
+	 * and their distance from the top in their own units, so the row grows from the top's middle and keeps its shape.
+	 * The close button is a screen's, not the row's, and is never sized.
+	 */
+	static Box box(Button button, int width, int height, TouchPad.Layout layout, TouchMode mode, float topScale) {
 		boolean group = inGroup(button);
 		Button place = group && mode != TouchMode.CROSSHAIR ? lower(button) : button;
 		float size = group ? button.size() * layout.buttonSize() : button.size();
 		int unit = Math.max(1, Math.round(size * height / GRID));
 		if (group) {
 			unit = Math.min(unit, Math.max(1, (int) ((height - 1) / GROUP_HEIGHT)));
+		} else if (button != CLOSE) {
+			// Small's whole units scaled, so Big is exactly twice Small and Medium as near half again as whole units go.
+			unit = Math.max(1, Math.round(unit * topScale));
 		}
 		int side = unit * GRID;
 		int centreX = Math.round(place.fromX() * width + place.offsetX() * unit) + (group ? Math.round(layout.buttonsX() * height) : 0);
@@ -467,7 +479,7 @@ public final class TouchButtons {
 	 * view's layout, the ones hung from the bottom moved together by {@link #shift}.
 	 */
 	static Box box(Button button, TouchPad.View view) {
-		Box box = box(button, view.width(), view.height(), view.layout(), view.mode());
+		Box box = box(button, view.width(), view.height(), view.layout(), view.mode(), view.topScale());
 		if (!inGroup(button)) {
 			return box;
 		}

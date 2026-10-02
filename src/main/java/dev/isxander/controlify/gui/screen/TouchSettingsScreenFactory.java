@@ -11,6 +11,7 @@ import dev.isxander.controlify.api.ControlifyApi;
 import dev.isxander.controlify.config.dto.TouchConfig;
 import dev.isxander.controlify.config.settings.TouchSettings;
 import dev.isxander.controlify.touch.JoystickVisibility;
+import dev.isxander.controlify.touch.TopButtonSize;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
 import dev.isxander.controlify.touch.TouchPad;
@@ -30,8 +31,8 @@ import net.minecraft.network.chat.Component;
  * The touch controls' own settings screen (tl122), opened from Global Settings, after Bedrock's Touch settings page:
  * when they are on, the mode they play in, the way to the glyph editor's Touch tab to move and size them, how fast a
  * swipe turns the camera (tl123), whether up is down (tl130), how much it slows through a spyglass (tl127), the Pick
- * Block button (tl128), auto jump (tl124), when the joystick shows, the perspective button and easy sprint (tl131), and
- * which side of the hotbar the inventory button is on (tl133), in Bedrock's order.
+ * Block button (tl128), auto jump (tl124), when the joystick shows, the perspective button and easy sprint (tl131),
+ * which side of the hotbar the inventory button is on (tl133) and how big the top row is (tl135), in Bedrock's order.
  */
 public final class TouchSettingsScreenFactory {
 	private TouchSettingsScreenFactory() {
@@ -130,6 +131,12 @@ public final class TouchSettingsScreenFactory {
 								.description(OptionDescription.of(Component.translatable("controlify.touch.easy_sprint.tooltip")))
 								.binding(defaults.easySprint, () -> touch.easySprint, value -> touch.easySprint = value)
 								.controller(option -> BooleanControllerBuilder.create(option).onOffFormatter())
+								.build())
+						.option(Option.<TopButtonSize>createBuilder()
+								.name(Component.translatable("controlify.touch.top_button_size"))
+								.description(OptionDescription.of(Component.translatable("controlify.touch.top_button_size.tooltip")))
+								.binding(defaults.topButtonSize, () -> touch.topButtonSize, value -> touch.topButtonSize = value)
+								.controller(option -> EnumControllerBuilder.create(option).enumClass(TopButtonSize.class))
 								.build())
 						.build())
 				.build().generateScreen(parent);

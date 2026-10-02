@@ -1015,5 +1015,10 @@
   "controlify.touch.easy_sprint": "Easy Sprint",
   "controlify.touch.easy_sprint.tooltip": "Pushing the joystick past its edge sprints, with no button needed. Off, sprint with the sprint button.",
   "controlify.touch.left_handed_inventory": "Left-Handed Inventory Access",
-  "controlify.touch.left_handed_inventory.tooltip": "Puts the inventory button (the three dots) on the left of the hotbar instead of the right, easier to reach for left-handed players."
+  "controlify.touch.left_handed_inventory.tooltip": "Puts the inventory button (the three dots) on the left of the hotbar instead of the right, easier to reach for left-handed players.",
+  "controlify.touch.top_button_size": "Top Button Size",
+  "controlify.touch.top_button_size.tooltip": "How big the buttons along the top of the screen are: chat, pause and the camera perspective button.",
+  "controlify.touch.top_button_size.small": "Small",
+  "controlify.touch.top_button_size.medium": "Medium",
+  "controlify.touch.top_button_size.big": "Big"
 }

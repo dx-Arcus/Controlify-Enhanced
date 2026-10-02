@@ -212,10 +212,11 @@ public final class TouchPad {
 	 * The window a frame of fingers is read against: its size in pixels and in GUI pixels, the GUI scale,
 	 * whether the hotbar is there to tap (no spectators), where the inventory slot after it is, whether the
 	 * player is flying (jump and sneak show up and down), the time, the player's layout, the mode they
-	 * play in (tl118), and the interact button if there is one this frame (tl119).
+	 * play in (tl118), the interact button if there is one this frame (tl119), and the top row's size as a multiple of
+	 * Small's (tl135).
 	 */
 	record View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode,
-			TouchInteract.@Nullable Shown interact) {
+			TouchInteract.@Nullable Shown interact, float topScale) {
 		/** The same window with the default layout. */
 		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos) {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, Layout.DEFAULT);
@@ -229,6 +230,12 @@ public final class TouchPad {
 		/** The same window in this mode, with no interact button, as every build before tl119 had. */
 		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode) {
 			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, mode, null);
+		}
+
+		/** The same window with the top row Small, as every build before tl135 had. */
+		View(int width, int height, int scale, int guiWidth, int guiHeight, boolean hotbar, int inventoryX, boolean flying, long nanos, Layout layout, TouchMode mode,
+				TouchInteract.@Nullable Shown interact) {
+			this(width, height, scale, guiWidth, guiHeight, hotbar, inventoryX, flying, nanos, layout, mode, interact, 1f);
 		}
 
 		/** Whether a tap on the world uses and attacks, and a hold breaks (tl118) - in D-pad mode too (tl121). */
@@ -447,7 +454,7 @@ public final class TouchPad {
 			inventoryX = TouchButtons.inventoryLeftX(guiWidth, leftSideTaken);
 		}
 		return new View(window.getWidth(), window.getHeight(), window.getGuiScale(), guiWidth, window.getGuiScaledHeight(),
-				hotbar, inventoryX, flying, System.nanoTime(), layout, scheme, TouchInteract.shown());
+				hotbar, inventoryX, flying, System.nanoTime(), layout, scheme, TouchInteract.shown(), topButtonSize().scale());
 	}
 
 	/** The layout the player saved for the scheme they play (tl129), or the default before there is a config to read it from. */
@@ -566,6 +573,12 @@ public final class TouchPad {
 	 */
 	static boolean leftSideTaken(HumanoidArm mainArm, boolean offhandHeld, boolean attackIndicatorOnHotbar) {
 		return mainArm == HumanoidArm.RIGHT ? offhandHeld : attackIndicatorOnHotbar;
+	}
+
+	/** How big the top row is (tl135), or Small before there is a config to read it from, as by default. */
+	static TopButtonSize topButtonSize() {
+		ConfigManager config = Controlify.instance().config();
+		return config == null ? TopButtonSize.SMALL : config.getSettings().touchSettings().topButtonSize;
 	}
 
 	/** Whether the inventory button is on the left of the hotbar (tl133), or not before there is a config to read it from, as by default. */

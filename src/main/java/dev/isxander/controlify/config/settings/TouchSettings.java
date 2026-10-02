@@ -9,6 +9,7 @@ package dev.isxander.controlify.config.settings;
 import dev.isxander.controlify.config.dto.TouchConfig;
 import dev.isxander.controlify.config.dto.TouchLayoutConfig;
 import dev.isxander.controlify.touch.JoystickVisibility;
+import dev.isxander.controlify.touch.TopButtonSize;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
 import net.minecraft.util.Mth;
@@ -20,8 +21,8 @@ import java.util.Optional;
  * fields below and the tap schemes' in their own - edited in the glyph editor's Touch tab, the mode (tl118),
  * when they are on (tl120), joystick visibility (tl131), the camera sensitivity (tl123), invert Y (tl130), the spyglass
  * damping (tl127), the perspective button and easy sprint (tl131), auto jump (tl124), the Pick Block button (tl128)
- * and which side of the hotbar the inventory button is on (tl133), set in the touch settings screen - all read every
- * frame by the touch controls.
+ * which side of the hotbar the inventory button is on (tl133) and how big the top row is (tl135), set in the touch
+ * settings screen - all read every frame by the touch controls.
  * Offsets are fractions of the window's height, right and down positive; sizes are fractions of the default size,
  * {@link TouchConfig#MIN_SIZE} to {@link TouchConfig#MAX_SIZE}.
  */
@@ -53,6 +54,8 @@ public class TouchSettings {
 	public boolean easySprint;
 	/** Whether the inventory button sits on the left of the hotbar rather than the right (tl133). */
 	public boolean leftHandedInventory;
+	/** How big chat, pause and the camera perspective button are (tl135). */
+	public TopButtonSize topButtonSize;
 
 	private TouchSettings(float stickOffsetX, float stickOffsetY, float stickSize, float buttonsOffsetX, float buttonsOffsetY,
 			float buttonSize, TouchMode mode, TouchControls controls, int cameraSensitivity, boolean autoJump, int spyglassDamping,
@@ -77,6 +80,7 @@ public class TouchSettings {
 		this.perspectiveButton = options.perspectiveButton();
 		this.easySprint = options.easySprint();
 		this.leftHandedInventory = options.leftHandedInventory();
+		this.topButtonSize = options.topButtonSize() == null ? TopButtonSize.SMALL : options.topButtonSize();
 	}
 
 	/** A layout as read: offsets that are not numbers at all none, sizes within what the Touch tab offers. */
@@ -129,7 +133,8 @@ public class TouchSettings {
 	public TouchConfig toDTO() {
 		return new TouchConfig(stickOffsetX, stickOffsetY, stickSize, buttonsOffsetX, buttonsOffsetY, buttonSize, mode, controls,
 				cameraSensitivity, autoJump, spyglassDamping, pickBlock, own(tapLayout), own(dpadLayout),
-				new TouchConfig.Options(invertY, joystickVisibility, perspectiveButton, easySprint, leftHandedInventory));
+				new TouchConfig.Options(invertY, joystickVisibility, perspectiveButton, easySprint, leftHandedInventory,
+						topButtonSize));
 	}
 
 	/** A tap scheme's layout to save: none while it is aim crosshair's, which a missing one reads as. */
