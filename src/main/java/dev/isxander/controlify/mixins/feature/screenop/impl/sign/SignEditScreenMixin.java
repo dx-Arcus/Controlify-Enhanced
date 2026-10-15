@@ -22,10 +22,15 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 @Mixin(SignEditScreen.class)
 public class SignEditScreenMixin {
 
-	@ModifyReturnValue(method = "getSignYOffset", at = @At("RETURN"))
+	// 26.4 (snapshot 4) rebuilt the sign screens: getSignYOffset is gone (an int getSignTextYOffset took its place)
+	// and the on-screen keyboard is no longer embedded in them (AbstractSignEditScreenMixin), so there is no
+	// overlap to lift the sign clear of. Before 26.4, as before:
+	//? if <26.4 {
+	/*@ModifyReturnValue(method = "getSignYOffset", at = @At("RETURN"))
 	private float modifySignY(float original) {
 		return original - calculateOverlap();
 	}
+	*///?}
 
 
 	//? if <26.2 {

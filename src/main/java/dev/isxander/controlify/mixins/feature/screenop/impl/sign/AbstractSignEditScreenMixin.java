@@ -6,7 +6,12 @@
  */
 package dev.isxander.controlify.mixins.feature.screenop.impl.sign;
 
-import com.llamalad7.mixinextras.expression.Definition;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
+import net.minecraft.network.chat.Component;
+import org.spongepowered.asm.mixin.Mixin;
+//? if <26.4 {
+/*import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -24,24 +29,27 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.font.TextFieldHelper;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+*///?}
 
 @Mixin(AbstractSignEditScreen.class)
-public abstract class AbstractSignEditScreenMixin extends Screen implements ScreenProcessorProvider, MixinInputTarget {
-
-	@Shadow private @Nullable TextFieldHelper signField;
+public abstract class AbstractSignEditScreenMixin extends Screen /*? if <26.4 {*//*implements ScreenProcessorProvider, MixinInputTarget*//*?}*/ {
+	// 26.4 (snapshot 4) rebuilt the sign screen: its four lines are EditBox widgets (SignLineEditBox) in a
+	// layout, added through the layout rather than one addRenderableWidget call each, and the TextFieldHelper,
+	// the line index, charTyped and extractRenderState this mixin leaned on are gone. Until isXander's own
+	// snapshot-4 port says how he wants it, 26.4 leaves the screen to Controlify's general handling: EditBoxMixin
+	// gives every EditBox the keyboard overlay, the pad moves between the lines, Done is a plain button - no
+	// keyboard embedded in the screen, no line hint. Before 26.4, as before:
+	//? if <26.4 {
+	/*@Shadow private @Nullable TextFieldHelper signField;
 	@Shadow @Final private String[] messages;
 	@Shadow private int line;
 	@Shadow protected abstract void onDone();
@@ -59,13 +67,10 @@ public abstract class AbstractSignEditScreenMixin extends Screen implements Scre
 	);
 
 
-	protected AbstractSignEditScreenMixin(Component title) {
-		super(title);
-	}
 
-	/**
+	/^*
 	 * Add a screen keyboard if necessary.
-	 */
+	^/
 	@Inject(method = "init", at = @At("HEAD"))
 	private void addKeyboard(CallbackInfo ci) {
 		ControlifyApi.get().getCurrentController().ifPresent(c -> {
@@ -79,9 +84,9 @@ public abstract class AbstractSignEditScreenMixin extends Screen implements Scre
 		});
 	}
 
-	/**
+	/^*
 	 * Only add a "Done" button if we aren't doing an on-screen keyboard.
-	 */
+	^/
 	@WrapOperation(
 			method = "init",
 			at = @At(
@@ -164,5 +169,10 @@ public abstract class AbstractSignEditScreenMixin extends Screen implements Scre
 	@Override
 	public ScreenProcessor<?> screenProcessor() {
 		return screenProcessor;
+	}
+	*///?}
+
+	protected AbstractSignEditScreenMixin(Component title) {
+		super(title);
 	}
 }
