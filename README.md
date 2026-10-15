@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **You are on `custom/26.4`, the Minecraft 26.4 snapshot line.** It carries everything below, ported to the current 26.4 snapshot — first by isXander's own [`port/26.4`](https://github.com/isXander/Controlify/tree/port/26.4), then by this fork's fixes as testing finds what moved; when his next port lands, his fixes take precedence. It builds for Fabric only (no NeoForge exists for 26.4 yet), nothing is released from it, and snapshots break things between one and the next. For the release build, see the [`custom/26.3`](https://github.com/dx-Arcus/Controlify-Enhanced/tree/custom/26.3) branch and [Releases](https://github.com/dx-Arcus/Controlify-Enhanced/releases).
+
 ## What's different in this fork
 
 Touch controls modelled on Bedrock Edition's, controller aim assist with target lock, a few quality-of-life changes, and fixes for two annoyances — most of it on Controlify's **Global Settings** screen. Everything else behaves exactly like the official mod.
