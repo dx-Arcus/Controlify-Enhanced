@@ -16,11 +16,11 @@ import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-//? if >=26.3 {
-import com.mojang.renderpearl.api.pipeline.RenderPipeline;
-//?} else {
-/*import com.mojang.blaze3d.pipeline.RenderPipeline;
-*///?}
+//? if =26.3 {
+/*import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+*///?} else {
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+//?}
 
 public record BaseRenderState(
 		RenderPipeline pipeline,
@@ -56,7 +56,11 @@ public record BaseRenderState(
 	private static TextureSetup textureSetup(@Nullable Identifier textureId) {
 		if (textureId != null) {
 			var texture = Minecraft.getInstance().getTextureManager().getTexture(textureId);
-			return TextureSetup.singleTexture(texture.getTextureView(), texture.getSampler());
+			//? if >=26.4 {
+			return TextureSetup.singleTexture(texture.textureView(), texture.sampler());
+			//?} else {
+			/*return TextureSetup.singleTexture(texture.getTextureView(), texture.getSampler());
+			*///?}
 		}
 		return TextureSetup.noTexture();
 	}

@@ -17,6 +17,7 @@ import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.controller.id.ControllerType;
 import dev.isxander.controlify.gui.components.PlainTextWidget;
 import dev.isxander.controlify.mixins.feature.ui.AbstractSelectionListAccessor;
+import dev.isxander.controlify.mixins.feature.ui.ScreenAccessor;
 import dev.isxander.controlify.screenop.ScreenControllerEventListener;
 import dev.isxander.controlify.utils.CUtil;
 import dev.isxander.controlify.utils.MinecraftUtil;
@@ -37,7 +38,6 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.util.Util;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -90,7 +90,11 @@ public class ControlifySettingsScreen extends Screen implements ScreenController
 						.tooltip(Tooltip.create(Component.translatable("controlify.gui.carousel.controller_not_detected_btn.tooltip")))
 						.build()
 		);
-		controllerNotDetectedButton.visible = !hasController();
+		//? if >=26.4 {
+		controllerNotDetectedButton.setVisible(!hasController());
+		//?} else {
+		/*controllerNotDetectedButton.visible = !hasController();
+		*///?}
 		FrameLayout.centerInRectangle(controllerNotDetectedButton, 0, 0, this.width, this.mainPaneHeight);
 
 
@@ -118,7 +122,7 @@ public class ControlifySettingsScreen extends Screen implements ScreenController
 
 
 		// Main Pane
-		if (!this.controllerNotDetectedButton.visible) {
+		if (!this.controllerNotDetectedButton./*? if >=26.4 {*/isVisible()/*?} else {*//*visible*//*?}*/) {
 			int mainPaneX = 0;
 			int mainPaneY = 11;
 			int mainPaneHeight = this.mainPaneHeight - mainPaneY;
@@ -157,13 +161,13 @@ public class ControlifySettingsScreen extends Screen implements ScreenController
 
 	@Override
 	public void extractRenderState(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
-		if (this.controllerNotDetectedButton.visible == hasController()) {
+		if (this.controllerNotDetectedButton./*? if >=26.4 {*/isVisible()/*?} else {*//*visible*//*?}*/ == hasController()) {
 			this.repositionElements();
 		}
 
 		super.extractRenderState(graphics, mouseX, mouseY, a);
 
-		Identifier texture = minecraft.level == null ? Screen.FOOTER_SEPARATOR : Screen.INWORLD_FOOTER_SEPARATOR;
+		Identifier texture = minecraft.level == null ? Screen.FOOTER_SEPARATOR : ScreenAccessor.controlify$getInworldFooterSeparator();
 		graphics.blit(
 				RenderPipelines.GUI_TEXTURED,
 				texture,

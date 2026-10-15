@@ -8,7 +8,7 @@ package dev.isxander.controlify.compatibility.sodium.mixins;
 
 //? if sodium {
 
-import dev.isxander.controlify.compatibility.sodium.screenop.SliderControlProcessor;
+/*import dev.isxander.controlify.compatibility.sodium.screenop.SliderControlProcessor;
 import dev.isxander.controlify.screenop.ComponentProcessor;
 import dev.isxander.controlify.screenop.ComponentProcessorProvider;
 import net.caffeinemc.mods.sodium.client.config.structure.IntegerOption;
@@ -37,10 +37,10 @@ public abstract class SliderControlElementMixin extends ControlElement implement
 
 	@Unique private void controlify$incrementSlider(boolean reverse) {
 		var range = option.getSteppedValidator();
-		option.modifyValue(Mth.clamp(
+		option.modifyValue(Math.clamp(
 				option.getValidatedValue() + (reverse ? -range.step() : range.step()),
 				range.min(), range.max()
 		));
 	}
 }
-//?}
+*///?}
