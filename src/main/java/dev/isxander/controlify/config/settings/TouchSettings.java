@@ -12,7 +12,6 @@ import dev.isxander.controlify.touch.JoystickVisibility;
 import dev.isxander.controlify.touch.TopButtonSize;
 import dev.isxander.controlify.touch.TouchControls;
 import dev.isxander.controlify.touch.TouchMode;
-import net.minecraft.util.Mth;
 
 import java.util.Optional;
 
@@ -70,9 +69,9 @@ public class TouchSettings {
 		this.buttonSize = size(buttonSize);
 		this.mode = mode == null ? TouchMode.CROSSHAIR : mode;
 		this.controls = controls == null ? TouchControls.AUTOMATIC : controls;
-		this.cameraSensitivity = Mth.clamp(cameraSensitivity, TouchConfig.MIN_SENSITIVITY, TouchConfig.MAX_SENSITIVITY);
+		this.cameraSensitivity = Math.clamp(cameraSensitivity, TouchConfig.MIN_SENSITIVITY, TouchConfig.MAX_SENSITIVITY);
 		this.autoJump = autoJump;
-		this.spyglassDamping = Mth.clamp(spyglassDamping, TouchConfig.MIN_DAMPING, TouchConfig.MAX_DAMPING);
+		this.spyglassDamping = Math.clamp(spyglassDamping, TouchConfig.MIN_DAMPING, TouchConfig.MAX_DAMPING);
 		this.pickBlock = pickBlock;
 		// A tap scheme with no layout of its own has aim crosshair's, as every scheme did before tl129.
 		this.tapLayout = tapLayout.map(TouchSettings::read).orElse(layout(TouchMode.CROSSHAIR));
@@ -119,7 +118,7 @@ public class TouchSettings {
 
 	/** A size within what the Touch tab offers; a number that is not one at all is the default. */
 	public static float size(float size) {
-		return Float.isFinite(size) ? Mth.clamp(size, TouchConfig.MIN_SIZE, TouchConfig.MAX_SIZE) : 1f;
+		return Float.isFinite(size) ? Math.clamp(size, TouchConfig.MIN_SIZE, TouchConfig.MAX_SIZE) : 1f;
 	}
 
 	public static TouchSettings defaults() {

@@ -30,7 +30,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
@@ -140,7 +139,7 @@ public class ColorWheelScreen extends Screen {
 		}
 
 		void setValue(double v) {
-			value = (float) Mth.clamp(v, 0, 1);
+			value = (float) Math.clamp(v, 0, 1);
 			apply();
 		}
 

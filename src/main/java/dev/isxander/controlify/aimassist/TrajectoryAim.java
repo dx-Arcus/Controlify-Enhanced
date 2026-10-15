@@ -10,7 +10,6 @@ import dev.isxander.controlify.config.settings.AimAssistSettings;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.BowItem;
@@ -346,7 +345,7 @@ public final class TrajectoryAim {
 
 	/** Angle between two unit directions, in degrees. */
 	static double angleBetween(Vec3 a, Vec3 b) {
-		return Math.toDegrees(Math.acos(Mth.clamp(a.dot(b), -1, 1)));
+		return Math.toDegrees(Math.acos(Math.clamp(a.dot(b), -1, 1)));
 	}
 
 	private static @Nullable Vec3 direction(Vec3 eye, Vec3 playerMotion, boolean onGround, int ticksAhead, Vec3 middle, Vec3 lead,

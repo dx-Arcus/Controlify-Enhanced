@@ -319,7 +319,7 @@ public final class DevFunctionsPanel {
 
 	/** Whether a shown widget is under the cursor or holds focus. */
 	private static boolean under(AbstractWidget widget) {
-		return widget.visible && widget.isHoveredOrFocused();
+		return widget./*? if >=26.4 {*/isVisible()/*?} else {*//*visible*//*?}*/ && widget.isHoveredOrFocused();
 	}
 
 	/** y of the panel's top edge; the description area above is kept above this while the panel is shown. */
@@ -339,10 +339,10 @@ public final class DevFunctionsPanel {
 
 	private void applyVisibility() {
 		boolean shown = isShown();
-		frame.visible = shown;
+		setVisible(frame, shown);
 		for (Entry entry : buttons) {
 			// Invisible and inactive: not drawn, can't be clicked, can't be reached with a controller.
-			entry.button.visible = shown;
+			setVisible(entry.button, shown);
 			entry.button.active = shown && entry.available;
 			// A greyed-out button says so on its face. Its description only shows while it is hovered
 			// or focused, and a controller cannot focus a greyed-out button at all.
@@ -350,11 +350,20 @@ public final class DevFunctionsPanel {
 		}
 		for (Field field : fields) {
 			// A Label is never interactive; a box is only typed into while the panel is up.
-			field.label().visible = shown;
-			field.box().visible = shown;
+			setVisible(field.label(), shown);
+			setVisible(field.box(), shown);
 			field.box().active = shown;
 		}
 		toggle.setMessage(Component.literal(shown ? "✔" : ""));
+	}
+
+	/** Shows or hides a widget: 26.4 made the field protected and gave it a setter. */
+	private static void setVisible(AbstractWidget widget, boolean shown) {
+		//? if >=26.4 {
+		widget.setVisible(shown);
+		//?} else {
+		/*widget.visible = shown;
+		*///?}
 	}
 
 	private static GlobalSettings settings() {

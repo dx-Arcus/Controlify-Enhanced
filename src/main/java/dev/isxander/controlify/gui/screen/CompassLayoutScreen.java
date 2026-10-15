@@ -20,7 +20,6 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -228,7 +227,7 @@ public class CompassLayoutScreen extends OffsetEditorScreen {
 
 	private static double toSliderValue(int width) {
 		int span = CompassConfig.MAX_WIDTH - CompassConfig.MIN_WIDTH;
-		return Mth.clamp((double) (width - CompassConfig.MIN_WIDTH) / span, 0, 1);
+		return Math.clamp((double) (width - CompassConfig.MIN_WIDTH) / span, 0, 1);
 	}
 
 	private static int fromSliderValue(double value) {

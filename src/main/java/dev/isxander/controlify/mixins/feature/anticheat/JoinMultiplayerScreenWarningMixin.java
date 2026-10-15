@@ -66,7 +66,11 @@ public abstract class JoinMultiplayerScreenWarningMixin extends Screen {
 		}
 		ControlifySettings settings = Controlify.instance().config().getSettings();
 		Component line = AntiCheatWarning.line(settings.aimAssistSettings(), settings.globalSettings(), settings.touchSettings());
-		warning.visible = line != null;
+		//? if >=26.4 {
+		warning.setVisible(line != null);
+		//?} else {
+		/*warning.visible = line != null;
+		*///?}
 		if (line == null) {
 			return;
 		}

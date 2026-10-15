@@ -379,7 +379,7 @@ public final class AimAssist {
 		// A lock set to override the cone holds full strength from any angle, which is the setting
 		// that turns this from help near where you are aiming into outright tracking.
 		boolean ignoreCone = useLocked && lock.overrideCone;
-		double coneProximity = Math.sqrt(Mth.clamp(1 - (angle / cone), 0, 1));
+		double coneProximity = Math.sqrt(Math.clamp(1 - (angle / cone), 0, 1));
 
 		// Two different questions, which were sharing one answer. The pull asks how much help to
 		// give getting to the target; ignoring the cone means all of it, from any angle. The
@@ -395,7 +395,7 @@ public final class AimAssist {
 		boolean holdsPoint = aim != null;
 		double pullProximity = ignoreCone || holdsPoint ? 1 : coneProximity;
 		double slowProximity = ignoreCone
-				? Math.sqrt(Mth.clamp(1 - (angle / (TURN_IN_CUSHION * 2)), 0, 1))
+				? Math.sqrt(Math.clamp(1 - (angle / (TURN_IN_CUSHION * 2)), 0, 1))
 				: holdsPoint ? 0 : coneProximity;
 
 		double multiplier = 1 - (1 - slowdownFor(strength)) * slowProximity;
@@ -417,8 +417,8 @@ public final class AimAssist {
 		// the player or the mob is moving. Strafing past a zombie is the second kind, which is why
 		// the stick alone is not enough to gate this. Standing still with nothing moving is neither,
 		// and contributes nothing, so the camera never drifts on its own.
-		double stickStrength = Mth.clamp(lookImpulse.length() / FULL_PULL_INPUT, 0, 1);
-		double trackingStrength = Mth.clamp(swing / FULL_PULL_SWING, 0, 1);
+		double stickStrength = Math.clamp(lookImpulse.length() / FULL_PULL_INPUT, 0, 1);
+		double trackingStrength = Math.clamp(swing / FULL_PULL_SWING, 0, 1);
 		// Ignoring the cone means holding the target whatever is happening, including a standoff
 		// where neither the player nor the mob is moving, so the gate comes off entirely. So does
 		// Trajectory Aim: it moves the camera by itself, which is why it is off until switched on.
@@ -437,8 +437,8 @@ public final class AimAssist {
 		}
 		if (ignoreCone) {
 			double sweepBand = SWEEP_FULL_ANGLE - TURN_IN_CUSHION * 2;
-			double reach = Mth.clamp((angle - TURN_IN_CUSHION * 2) / sweepBand, 0, 1);
-			double sweepRate = MAX_SWEEP_RATE * Mth.clamp(lockedSpeed, 0, MAX_SCALED_PERCENT) / 100.0;
+			double reach = Math.clamp((angle - TURN_IN_CUSHION * 2) / sweepBand, 0, 1);
+			double sweepRate = MAX_SWEEP_RATE * Math.clamp(lockedSpeed, 0, MAX_SCALED_PERCENT) / 100.0;
 			effectiveCap = Mth.lerp(reach, effectiveCap, Math.max(effectiveCap, sweepRate));
 		}
 
@@ -542,7 +542,7 @@ public final class AimAssist {
 		// be helping. Input closing the gap is left alone until the crosshair is nearly there.
 		double closing = lookImpulse.x * yawError + lookImpulse.y * pitchError;
 		double exemption = closing > 0
-				? Mth.clamp((angle - TURN_IN_CUSHION) / TURN_IN_CUSHION, 0, 1)
+				? Math.clamp((angle - TURN_IN_CUSHION) / TURN_IN_CUSHION, 0, 1)
 				: 0;
 
 		lookImpulse.mul(Mth.lerp(exemption, multiplier, 1.0));
@@ -836,7 +836,7 @@ public final class AimAssist {
 	static Vec3 aimPoint(Entity entity) {
 		AABB box = entity.getBoundingBox();
 		// Clamped into the hitbox, since a few entities sit their eyes at or above their own box.
-		double y = Mth.clamp(box.minY + entity.getEyeHeight() * AIM_HEIGHT_FACTOR, box.minY, box.maxY);
+		double y = Math.clamp(box.minY + entity.getEyeHeight() * AIM_HEIGHT_FACTOR, box.minY, box.maxY);
 		return new Vec3((box.minX + box.maxX) / 2, y, (box.minZ + box.maxZ) / 2);
 	}
 
@@ -918,7 +918,7 @@ public final class AimAssist {
 		if (alongside.lengthSqr() > 1.0e-12
 				&& a.cross(alongside).dot(normal) >= 0
 				&& alongside.cross(b).dot(normal) >= 0) {
-			return Math.toDegrees(Math.asin(Mth.clamp(Math.abs(v.dot(normal)), 0, 1)));
+			return Math.toDegrees(Math.asin(Math.clamp(Math.abs(v.dot(normal)), 0, 1)));
 		}
 		return Math.min(angleBetween(v, a), angleBetween(v, b));
 	}
@@ -934,7 +934,7 @@ public final class AimAssist {
 		if (lengths == 0) {
 			return 180;
 		}
-		return Math.toDegrees(Math.acos(Mth.clamp((a.x * bx + a.y * by + a.z * bz) / lengths, -1, 1)));
+		return Math.toDegrees(Math.acos(Math.clamp((a.x * bx + a.y * by + a.z * bz) / lengths, -1, 1)));
 	}
 
 	/*
@@ -950,12 +950,12 @@ public final class AimAssist {
 	 * stick pushed backwards.
 	 */
 	private static double slowdownFor(int percent) {
-		return 1 - Mth.clamp(percent, 0, 100) / 100.0;
+		return 1 - Math.clamp(percent, 0, 100) / 100.0;
 	}
 
 	/** Strength: the ceiling on the pull, in degrees per tick. Twice melee's at a locked 100%. */
 	private static double pullFor(int percent) {
-		return MAX_PULL * Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
+		return MAX_PULL * Math.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
 	}
 
 	/**
@@ -964,7 +964,7 @@ public final class AimAssist {
 	 * stronger lock raises the follow's ceiling instead - {@link #followCeilingFor}.
 	 */
 	private static double followFor(int percent) {
-		return MAX_FOLLOW * Mth.clamp(percent, 0, 100) / 100.0;
+		return MAX_FOLLOW * Math.clamp(percent, 0, 100) / 100.0;
 	}
 
 	/**
@@ -974,7 +974,7 @@ public final class AimAssist {
 	 * crosshair past a mob sliding across the view.
 	 */
 	private static double followCeilingFor(int percent) {
-		return MAX_FOLLOW_RATE * Math.max(1, Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
+		return MAX_FOLLOW_RATE * Math.max(1, Math.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
 	}
 
 	/**
@@ -982,7 +982,7 @@ public final class AimAssist {
 	 * closes 90% of it: closing more than all of it would overshoot, which reads as shaking.
 	 */
 	private static double gainFor(int percent) {
-		return MAX_GAIN * Mth.clamp(percent, 0, 100) / 100.0;
+		return MAX_GAIN * Math.clamp(percent, 0, 100) / 100.0;
 	}
 
 	/**
@@ -990,11 +990,11 @@ public final class AimAssist {
 	 * the pull may turn. Twice at a locked 100%; 1 up to 100, where Speed is the gain alone.
 	 */
 	private static double speedBoost(int percent) {
-		return Math.max(1, Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
+		return Math.max(1, Math.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0);
 	}
 
 	/** How fast the pull may take the crosshair to Trajectory Aim's point, in degrees a tick. */
 	private static double trajectoryRateFor(int percent) {
-		return MAX_TRAJECTORY_RATE * Mth.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
+		return MAX_TRAJECTORY_RATE * Math.clamp(percent, 0, MAX_SCALED_PERCENT) / 100.0;
 	}
 }

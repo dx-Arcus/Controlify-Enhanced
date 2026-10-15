@@ -49,7 +49,14 @@ public class GuiMixin {
 	 * focused - so with the focus cleared, every key landed on nothing (tl106).
 	 */
 	@WrapWithCondition(method = "setScreen", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;clearFocus()V"))
-	private boolean preventClearingOldScreenFocus(Screen oldScreen, @Local(argsOnly = true, name = "screen") Screen screen) {
+	private boolean preventClearingOldScreenFocus(
+			Screen oldScreen,
+			//? if >=26.4 {
+			@Local(argsOnly = true, name = "newScreen") Screen screen
+			//?} else {
+			/*@Local(argsOnly = true, name = "screen") Screen screen
+			*///?}
+	) {
 		return !(screen instanceof KeyboardOverlayScreen);
 	}
 	//?}

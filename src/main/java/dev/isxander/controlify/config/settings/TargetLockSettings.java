@@ -12,7 +12,6 @@ import dev.isxander.controlify.aimassist.TargetLockMode;
 import dev.isxander.controlify.config.dto.CompassConfig;
 import dev.isxander.controlify.config.dto.LockBindConfig;
 import dev.isxander.controlify.config.dto.TargetLockConfig;
-import net.minecraft.util.Mth;
 
 /** Live target lock settings, shown on the Aim Assist screen and read every tick while locked. */
 public class TargetLockSettings {
@@ -139,6 +138,6 @@ public class TargetLockSettings {
 	 */
 	public double resetRadiusFor(boolean flying) {
 		int range = rangeFor(flying);
-		return range * (1 - Mth.clamp(resetPercent, 0, 100) / 100.0);
+		return range * (1 - Math.clamp(resetPercent, 0, 100) / 100.0);
 	}
 }

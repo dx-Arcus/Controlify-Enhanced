@@ -130,12 +130,13 @@ public final class TargetLockRenderer {
 			return;
 		}
 
-		//? if >=26.3 {
-		// Nothing to draw here. The marker is real geometry in the world now, handed to the level
-		// renderer by TargetLockRenderer#submitWorldMarker so it goes through the same solid pass
-		// the mobs do - which is the only way it gets to write depth, and the only way anything
-		// drawn after it can be made to respect it.
-		//?} else {
+		// From 26.3 there is nothing to draw here. The marker is real geometry in the world now, handed
+		// to the level renderer by TargetLockRenderer#submitWorldMarker so it goes through the same solid
+		// pass the mobs do - which is the only way it gets to write depth, and the only way anything
+		// drawn after it can be made to respect it. Before 26.3 it is painted over the finished picture.
+		// (The comment sits outside the markers on purpose: Stonecutter reads a branch made only of //
+		// lines as disabled code and strips the slashes when it generates a version the branch is on for.)
+		//? if <26.3 {
 		/*drawOverTheWorld(graphics, minecraft, camera, player, target, markerPos, relative,
 				forward, up, left, depth, partial, width, height, settings);
 		*///?}
@@ -452,7 +453,7 @@ public final class TargetLockRenderer {
 				v = (float) (ys[i] / UV_SPAN);
 			}
 			corners[i] = new Corner(xs[i], ys[i], zs[i], u, v,
-					(float) (TIP_SHADE + (1 - TIP_SHADE) * Mth.clamp(ys[i] / TOTAL_HEIGHT, 0, 1)));
+					(float) (TIP_SHADE + (1 - TIP_SHADE) * Math.clamp(ys[i] / TOTAL_HEIGHT, 0, 1)));
 		}
 		faces.add(new Face(nx, ny, nz, corners));
 	}
@@ -484,7 +485,7 @@ public final class TargetLockRenderer {
 	 */
 	private static float distanceScale(double distance, double floorBlocks) {
 		double minScale = SCALE_NEAR_BLOCKS / Math.max(floorBlocks, SCALE_NEAR_BLOCKS);
-		return (float) Mth.clamp(SCALE_NEAR_BLOCKS / distance, minScale, 1.0);
+		return (float) Math.clamp(SCALE_NEAR_BLOCKS / distance, minScale, 1.0);
 	}
 
 	/**
@@ -635,7 +636,7 @@ public final class TargetLockRenderer {
 	}
 
 	private static int argb(int rgb, float alpha) {
-		return (Mth.clamp(Math.round(alpha * 255), 0, 255) << 24) | (rgb & 0xFFFFFF);
+		return (Math.clamp(Math.round(alpha * 255), 0, 255) << 24) | (rgb & 0xFFFFFF);
 	}
 
 	private static int shade(int rgb, float factor) {
@@ -643,16 +644,16 @@ public final class TargetLockRenderer {
 	}
 
 	private static int channel(int rgb, int shift, float factor) {
-		return Mth.clamp(Math.round(((rgb >> shift) & 0xFF) * factor), 0, 255);
+		return Math.clamp(Math.round(((rgb >> shift) & 0xFF) * factor), 0, 255);
 	}
 
 	private static int lighten(int rgb, float amount) {
 		int r = (rgb >> 16) & 0xFF;
 		int g = (rgb >> 8) & 0xFF;
 		int b = rgb & 0xFF;
-		r = Mth.clamp(Math.round(r + (255 - r) * amount), 0, 255);
-		g = Mth.clamp(Math.round(g + (255 - g) * amount), 0, 255);
-		b = Mth.clamp(Math.round(b + (255 - b) * amount), 0, 255);
+		r = Math.clamp(Math.round(r + (255 - r) * amount), 0, 255);
+		g = Math.clamp(Math.round(g + (255 - g) * amount), 0, 255);
+		b = Math.clamp(Math.round(b + (255 - b) * amount), 0, 255);
 		return r << 16 | g << 8 | b;
 	}
 }

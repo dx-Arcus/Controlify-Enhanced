@@ -289,9 +289,16 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	 */
 	private static final class Page extends GridLayoutTab {
 		private final List<AbstractWidget> widgets = new ArrayList<>();
+		/** The tab's name. Kept here because 26.4's GridLayoutTab no longer carries one; the bar is handed it instead. */
+		final Component title;
 
 		Page(Component title) {
-			super(title);
+			//? if >=26.4 {
+			super();
+			//?} else {
+			/*super(title);
+			*///?}
+			this.title = title;
 		}
 
 		@Override
@@ -346,7 +353,14 @@ public class GuideOffsetEditScreen extends OffsetEditorScreen {
 	/** The bar across the top, Guides and Touch: the game's own menu tab bar, which a controller's bumpers step through. */
 	private TabNavigationBar tabBar(TabManager tabManager, Page guides, Page touch) {
 		//? if >=26.2 {
-		TabNavigationBar bar = MenuTabBar.builder(tabManager, width).addTabs(guides, touch).build();
+		TabNavigationBar bar = MenuTabBar.builder(tabManager, width)
+				// 26.4's builder takes each tab with its name; 26.2 and 26.3's take the tabs, which carry their own.
+				//? if >=26.4 {
+				.addTab(guides.title, guides).addTab(touch.title, touch)
+				//?} else {
+				/*.addTabs(guides, touch)
+				*///?}
+				.build();
 		bar.arrangeElements(width);
 		//?} else {
 		/*TabNavigationBar bar = TabNavigationBar.builder(tabManager, width).addTabs(guides, touch).build();

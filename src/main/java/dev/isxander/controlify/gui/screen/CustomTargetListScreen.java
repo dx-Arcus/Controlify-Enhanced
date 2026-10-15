@@ -32,7 +32,11 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+//? if >=26.4 {
+import net.minecraft.client.gui.screens.social.EntityPortraitWidget;
+//?} else {
+/*import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+*///?}
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
@@ -45,7 +49,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -709,7 +712,7 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 	}
 
 	private void clampScroll() {
-		scroll = Mth.clamp(scroll, 0, Math.max(0, contentHeight() - viewHeight()));
+		scroll = Math.clamp(scroll, 0, Math.max(0, contentHeight() - viewHeight()));
 	}
 
 	@Override
@@ -881,7 +884,7 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 		if (model != null) {
 			// A real model, lit and posed. Scaled per mob so a bee and an ender dragon both end up
 			// row height.
-			int scale = (int) Mth.clamp(ICON_TARGET_HEIGHT / Math.max(0.4f, model.getBbHeight()), 4, 48);
+			int scale = (int) Math.clamp(ICON_TARGET_HEIGHT / Math.max(0.4f, model.getBbHeight()), 4, 48);
 			try {
 				drawModel(graphics, model, iconLeft, y, scale, mouseX, mouseY);
 				drewModel = true;
@@ -989,8 +992,15 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 		int bottom = y + ROW_HEIGHT - 1;
 
 		if (!Controlify.instance().currentInputMode().isController()) {
-			InventoryScreen.extractEntityInInventoryFollowsMouse(graphics, left, top, right, bottom,
+			// 26.4 moved the game's own portrait drawing off InventoryScreen onto the social screen's widget,
+			// and widened its scale and mouse arguments to floats; the call is otherwise the same.
+			//? if >=26.4 {
+			EntityPortraitWidget.extractEntityInInventoryFollowsMouse(graphics, left, top, right, bottom,
 					scale, 0f, mouseX, mouseY, model);
+			//?} else {
+			/*InventoryScreen.extractEntityInInventoryFollowsMouse(graphics, left, top, right, bottom,
+					scale, 0f, mouseX, mouseY, model);
+			*///?}
 			return;
 		}
 		turnInPlace(graphics, model, left, top, right, bottom, scale);
@@ -1220,9 +1230,9 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 			cursor = -1;
 			return;
 		}
-		int first = Mth.clamp((int) Math.ceil(scroll / ROW_HEIGHT), 0, visible.size() - 1);
-		int last = Mth.clamp((int) ((scroll + viewHeight()) / ROW_HEIGHT) - 1, first, visible.size() - 1);
-		cursor = Mth.clamp(cursor < 0 ? first : cursor, first, last);
+		int first = Math.clamp((int) Math.ceil(scroll / ROW_HEIGHT), 0, visible.size() - 1);
+		int last = Math.clamp((int) ((scroll + viewHeight()) / ROW_HEIGHT) - 1, first, visible.size() - 1);
+		cursor = Math.clamp(cursor < 0 ? first : cursor, first, last);
 	}
 
 	private void toggle(Entry entry) {
@@ -1258,7 +1268,7 @@ public class CustomTargetListScreen extends Screen implements ScreenControllerEv
 			return;
 		}
 		double along = (mouseY - listTop - thumbHeight / 2.0) / travel;
-		scroll = Mth.clamp(along, 0, 1) * overflow;
+		scroll = Math.clamp(along, 0, 1) * overflow;
 		clampScroll();
 	}
 

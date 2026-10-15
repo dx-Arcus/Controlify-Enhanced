@@ -156,7 +156,7 @@ public final class CompassBarRenderer {
 
 	/** Never wider than the screen, whatever the setting says, so it cannot run off both ends. */
 	public static int barWidth(int setting, int guiWidth) {
-		return Math.min(Mth.clamp(setting, CompassConfig.MIN_WIDTH, CompassConfig.MAX_WIDTH), Math.max(guiWidth, CompassConfig.MIN_WIDTH));
+		return Math.min(Math.clamp(setting, CompassConfig.MIN_WIDTH, CompassConfig.MAX_WIDTH), Math.max(guiWidth, CompassConfig.MIN_WIDTH));
 	}
 
 	/** Centred on the screen, then nudged by however far the player dragged it. */
@@ -296,6 +296,6 @@ public final class CompassBarRenderer {
 
 	private static int channel(int value, float factor) {
 		float scaled = factor >= 1 ? value + (255 - value) * (factor - 1) : value * factor;
-		return Mth.clamp(Math.round(scaled), 0, 255);
+		return Math.clamp(Math.round(scaled), 0, 255);
 	}
 }

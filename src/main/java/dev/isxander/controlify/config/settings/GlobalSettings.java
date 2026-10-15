@@ -14,7 +14,6 @@ import dev.isxander.controlify.server.ServerPolicies;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -108,7 +107,7 @@ public class GlobalSettings {
 		this.showSplitscreenAd = showSplitscreenAd;
 		this.preferredProfile = Math.max(0, preferredProfile);
 		this.showDevFunctions = showDevFunctions;
-		this.colorPointerSpeed = Mth.clamp(colorPointerSpeed,
+		this.colorPointerSpeed = Math.clamp(colorPointerSpeed,
 				DevConfig.MIN_COLOR_POINTER_SPEED, DevConfig.MAX_COLOR_POINTER_SPEED);
 		this.wiredPaths = wiredPaths == null ? "" : wiredPaths;
 		this.wirelessPaths = wirelessPaths == null ? "" : wirelessPaths;
